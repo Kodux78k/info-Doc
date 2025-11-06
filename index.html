@@ -152,93 +152,6 @@ blockquote.bq-l3{border-left-width:9px;opacity:.92}
 #fab .menu .btn:active { transform: translateY(1px); opacity: 1; }
 </style>
 
-<style id="INFODOCS_PATCH_INLINE_V12">
-/* ——— MOBILE-FIRST VERTICAL HARD-LOCK ——— */
-:root{
-  --idtts-left:   10px;
-  --idtts-bottom: 200px;
-  --idtts-gap:    8px;
-
-  /* tamanhos (pode reduzir à vontade) */
-  --idtts-btn:    42px;  /* era 48px */
-  --idtts-radius: 12px;
-  --idtts-icon:   29px;  /* se quiser menor: 26px */
-
-  /* Nebula + Base Madeira */
-  --idtts-ink:     rgba(255,255,255,.92);
-  --idtts-ink-dim: rgba(255,255,255,.72);
-  --idtts-bg:      rgba(15,18,28,.38);
-  --idtts-bd:      rgba(255,255,255,.12);
-  --idtts-glow:    #00E28B;
-}
-
-.svg-icon-29{ width:var(--idtts-icon); height:var(--idtts-icon); stroke:currentColor; fill:none; display:inline-block; vertical-align:middle; }
-
-/* destaque do bloco atual */
-[data-tts-current]{
-  outline:2px dashed color-mix(in srgb, var(--idtts-glow) 70%, #00d0ff 30%);
-  background:rgba(76,240,255,.06);
-  border-radius:8px;
-  transition:background .2s ease, outline .2s ease;
-}
-
-/* Dock overlay (não move layout) */
-.infodocs-tts{
-  position:fixed; left:var(--idtts-left);
-  bottom:calc(var(--idtts-bottom) + env(safe-area-inset-bottom,0px));
-  z-index:9999; display:flex; flex-direction:column; gap:var(--idtts-gap);
-  padding:.5rem; border-radius:14px; align-items:stretch;
-  background:var(--idtts-bg); border:1px solid var(--idtts-bd);
-  -webkit-backdrop-filter: blur(10px) saturate(1.15);
-  backdrop-filter: blur(10px) saturate(1.15);
-  box-shadow:0 12px 26px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.05);
-}
-
-/* Toggle (clicável + DRAG) */
-.infodocs-tts__toggle{
-  width:var(--idtts-icon); height:56px; border-radius:12px;
-  border:1px solid rgba(255,255,255,.18);
-  background:rgba(255,255,255,.06);
-  display:grid; place-items:center; color:var(--idtts-ink-dim);
-  cursor:grab; touch-action:none;
-}
-.infodocs-tts__toggle:hover{ color:var(--idtts-ink); }
-.infodocs-tts__toggle.is-drag{ cursor:grabbing; }
-
-/* Grupo de botões (menores) */
-.infodocs-tts__group{ display:flex; flex-direction:column; gap:6px; }
-.infodocs-tts__btn{
-  width:var(--idtts-btn); height:var(--idtts-btn); border-radius:var(--idtts-radius);
-  display:grid; place-items:center;
-  border:1px solid rgba(255,255,255,.18);
-  color:var(--idtts-ink-dim);
-  background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02));
-  cursor:pointer;
-  transition:transform .15s ease, color .15s ease, box-shadow .15s ease;
-}
-.infodocs-tts__btn:hover{ transform:translateY(-1px); color:var(--idtts-ink); }
-.infodocs-tts__btn[aria-pressed="true"]{
-  outline:2px solid var(--idtts-glow);
-  box-shadow:0 0 20px -2px var(--idtts-glow), 0 10px 26px rgba(0,0,0,.38);
-}
-
-/* Sanfona */
-.infodocs-tts[data-collapsed="1"] .infodocs-tts__group{ display:none; }
-
-/* STATUS ultra-compacto: “uma palavra por linha” */
-.infodocs-tts small[data-tts-status]{
-  color:var(--idtts-ink); opacity:.85;
-  display:grid; place-items:center;
-  font:600 11px/1 system-ui; width:var(--idtts-btn);
-  margin-top:2px; user-select:none;
-}
-.infodocs-tts small[data-tts-status] span{ display:block; line-height:1.05; }
-.infodocs-tts small[data-tts-status] .s1{ font-size:12px; }
-.infodocs-tts small[data-tts-status] .s2{ opacity:.6; }
-.infodocs-tts small[data-tts-status] .s3{ font-size:11px; opacity:.85; }
-</style>
-
-
 </head>
 <body>
 <div class="nebula"></div>
@@ -2910,210 +2823,473 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
 </script>
 
 
-<script id="INFODOCS_TTS_INLINE_V12">
-(()=>{
-  if(window.__INFODOCS_TTS_INLINE_V12_ACTIVE) return;
-  window.__INFODOCS_TTS_INLINE_V12_ACTIVE = true;
+<!-- KOBLLUX :: PATCH ÚNICO — TTS por Blocos (v2 • Dock Vertical + Drag + Auto-Wire) -->
+<style>
+  /* =======================================================================
+     KOBLLUX — TTS Dock (Nebula Pro + Base Madeira)
+     MOBILE-FIRST VERTICAL HARD-LOCK
+     ======================================================================= */
 
-  const POS_KEY='infodocs_tts_pos_v1';
-  const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
-  try{ synth && synth.cancel(); }catch(e){}
-  if(!synth){ console.warn('[InfoDocs:TTS] SpeechSynthesis indisponível'); return; }
+  /* Destaque do bloco atual lido */
+  [data-tts-current]{
+    outline:2px dashed var(--cyan,#4cf);
+    background:rgba(76,240,255,.06);
+    border-radius:8px;
+    transition:background .25s ease, outline .25s ease;
+  }
 
-  /* raízes tolerantes */
-  const ROOTS = ['#root','[data-analyzer-output]','.analyzer-output','#render','main','.content'];
-  const getRoot = ()=>{ for(const s of ROOTS){ const el=document.querySelector(s); if(el) return el; } return document.body; };
+  /* Tokens */
+  :root{
+    --tts-dock-left: 8px;         /* ajuste livre */
+    --tts-dock-bottom: 269px;     /* ajuste livre */
+    --tts-gap: 10px;
 
-  /* monta UI */
-  const panel = document.querySelector('.infodocs-tts') || (()=> {
-    const p = document.createElement('div');
-    p.className = 'infodocs-tts';
-    p.setAttribute('data-collapsed', localStorage.getItem('infodocs_tts_collapsed')==='1'?'1':'0');
+    --tts-glass-bg: rgba(15,18,28,.38);
+    --tts-glass-bd: rgba(255,255,255,.12);
+    --tts-glow:     rgba(76,240,255,.85);   /* ciano (Nebula) */
+    --tts-ink:      rgba(255,255,255,.92);
+    --tts-ink-dim:  rgba(255,255,255,.68);
+    --tts-accent:   color-mix(in srgb, #00e28b 55%, var(--tts-glow) 45%); /* Base Madeira + ciano */
+  }
 
-    const toggle = document.createElement('button');
-    toggle.className = 'infodocs-tts__toggle';
-    toggle.innerHTML = `<svg class="svg-icon-29"><use href="#id-ic-chev"></use></svg>`;
-    toggle.title = 'Expandir/Recolher / Arrastar';
+  /* Base inline (fallback) */
+  .kob-tts-panel{
+    display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem 0
+  }
+  .kob-tts-panel button{
+    padding:.5rem .75rem;
+    border:1px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.05);
+    backdrop-filter:saturate(1.2) blur(2px);
+    border-radius:10px
+  }
+  .kob-tts-panel small{opacity:.8}
 
-    /* DRAG no toggle com click seguro (click se mover < 6px) */
-    let sx=0, sy=0, sl=0, sb=0, moved=false;
-    const cs = ()=> getComputedStyle(document.documentElement);
-    const setPos = (l,b)=> {
-      document.documentElement.style.setProperty('--idtts-left', `${Math.max(0,l)}px`);
-      document.documentElement.style.setProperty('--idtts-bottom', `${Math.max(0,b)}px`);
-    };
-    const savePos = ()=> {
-      try{
-        const c = cs();
-        const L = parseFloat(c.getPropertyValue('--idtts-left'))||10;
-        const B = parseFloat(c.getPropertyValue('--idtts-bottom'))||200;
-        localStorage.setItem(POS_KEY, JSON.stringify({L,B}));
-      }catch(e){}
-    };
-    /* restauro posição */
+  /* Dock vertical fixo */
+  .kob-tts-panel.is-dock{
+    position: fixed;
+    left: var(--tts-dock-left);
+    bottom: calc(var(--tts-dock-bottom) + env(safe-area-inset-bottom, 0px));
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: var(--tts-gap);
+    align-items: stretch;
+
+    padding: .6rem;
+    border-radius: 16px;
+    background: var(--tts-glass-bg);
+    border: 1px solid var(--tts-glass-bd);
+    -webkit-backdrop-filter: blur(10px) saturate(1.15);
+    backdrop-filter: blur(10px) saturate(1.15);
+    box-shadow: 0 12px 26px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.05);
+
+    touch-action: none; /* habilita drag suave */
+    cursor: grab;
+  }
+  .kob-tts-panel.is-dock.is-dragging{
+    cursor: grabbing;
+    transition: none !important;
+  }
+
+  .kob-tts-panel.is-dock button{
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    display: grid; place-items: center;
+
+    color: var(--tts-ink-dim);
+    font-size: 20px; line-height: 1; font-weight: 600;
+
+    border: 1px solid rgba(255,255,255,.18);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02)) padding-box,
+      linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05)) border-box;
+
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+    cursor: pointer;
+    transition: transform .16s ease, box-shadow .16s ease, color .16s ease, background .16s ease;
+  }
+  .kob-tts-panel.is-dock button:hover{
+    transform: translateY(-1px);
+    color: var(--tts-ink);
+    box-shadow: 0 8px 18px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.10);
+  }
+  .kob-tts-panel.is-dock button:active{ transform: translateY(0); }
+
+  .kob-tts-panel.is-dock button[aria-pressed="true"]{
+    color: var(--tts-ink);
+    background:
+      radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--tts-glow), transparent 65%) 0%, transparent 60%) padding-box,
+      linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.08)) border-box;
+    outline: 2px solid color-mix(in srgb, var(--tts-glow) 70%, var(--tts-accent) 30%);
+    box-shadow:
+      0 0 18px -2px color-mix(in srgb, var(--tts-glow) 70%, var(--tts-accent) 30%),
+      0 10px 26px rgba(0,0,0,.38),
+      inset 0 0 0 1px rgba(255,255,255,.10);
+  }
+
+  /* micro-ripple sem JS */
+  .kob-tts-panel.is-dock button::after{
+    content:""; position:absolute; inset:0; border-radius:inherit; opacity:0;
+    box-shadow: 0 0 0 0 var(--tts-glow);
+    transition: box-shadow .4s ease, opacity .4s ease;
+  }
+  .kob-tts-panel.is-dock button:active::after{
+    opacity:.4; box-shadow: 0 0 0 10px transparent;
+  }
+
+  .kob-tts-panel.is-dock small[data-tts-status]{
+    margin-top: .15rem; font-size: 11px; letter-spacing: .2px;
+    opacity: .78; color: var(--tts-ink); max-width: 172px; text-wrap: balance;
+  }
+
+  .kob-tts-panel.is-dock button:focus-visible{
+    outline: 2px solid var(--tts-accent); outline-offset: 2px;
+  }
+
+  @supports not ((backdrop-filter: blur(10px))){
+    .kob-tts-panel.is-dock{ background: rgba(20,22,28,.85); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .kob-tts-panel.is-dock, .kob-tts-panel.is-dock button{ transition: none !important; }
+  }
+  @media print{ .kob-tts-panel.is-dock{ display:none !important; } }
+
+  /* Espaço opcional no conteúdo quando o dock existir */
+  body.kob-tts-dock-padding{ padding-left: calc(var(--tts-dock-left) + 72px); }
+</style>
+
+<script>
+(()=>{ // IIFE – instala somente uma vez
+  if(window.__KOB_TTS_V2_ACTIVE){ console.debug('[KOBLLUX TTS] já ativo'); return; }
+  window.__KOB_TTS_V2_ACTIVE = true;
+
+  const DOCKED = true;          // true = dock vertical fixo
+  const DRAG_ENABLED = true;    // arrastar e lembrar posição
+  const POS_KEY = 'kob_tts_dock_pos_v1';
+
+  // ——— Mitigar conflito com TTS antigo ———
+  try{
+    if('speechSynthesis' in window){ window.speechSynthesis.cancel(); }
+    if(window.__tts && typeof window.__tts.stop === 'function'){ try{ window.__tts.stop(); }catch(e){} }
+    window.__tts = { set:()=>{}, speak:()=>{}, stop:()=>{} }; // no-op legacy
+  }catch(e){}
+
+  const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+  if(!synth){ console.warn('[KOBLLUX TTS] SpeechSynthesis não disponível'); return; }
+
+  // ——— Seletores tolerantes para raiz renderizada/analisada ———
+  const ROOT_SELECTORS = ['#root','[data-analyzer-output]','.analyzer-output','#render','main','.content'];
+  const getRoot = ()=> {
+    for(const sel of ROOT_SELECTORS){
+      const el = document.querySelector(sel);
+      if(el) return el;
+    }
+    return document.body;
+  };
+
+  // ——— UI ———
+  const ensurePanel = ()=>{
+    let wrap = document.querySelector('.kob-tts-panel');
+    let btnT = document.getElementById('btn-tts');
+    let btnS = document.getElementById('btn-tts-sel');
+    let btnX = document.getElementById('btn-tts-stop');
+    let btnPrev = document.getElementById('btn-tts-prev');
+    let btnNext = document.getElementById('btn-tts-next');
+    let status = document.querySelector('[data-tts-status]');
+
+    if(!(btnT && btnS && btnX && status)){
+      wrap = document.createElement('div');
+      wrap.className = 'kob-tts-panel' + (DOCKED ? ' is-dock' : '');
+      wrap.innerHTML = DOCKED
+        ? `
+          <button id="btn-tts"       type="button" title="Ativar/Desativar leitura contínua" aria-pressed="false">🔊</button>
+          <button id="btn-tts-prev"  type="button" title="Bloco anterior">◀</button>
+          <button id="btn-tts-next"  type="button" title="Próximo bloco">▶</button>
+          <button id="btn-tts-sel"   type="button" title="Ler apenas seleção">✂︎</button>
+          <button id="btn-tts-stop"  type="button" title="Parar voz">■</button>
+          <small data-tts-status>Pronto.</small>
+        `
+        : `
+          <button id="btn-tts"       type="button" title="Ativar/Desativar leitura contínua">Voz: Off</button>
+          <button id="btn-tts-prev"  type="button" title="Bloco anterior">◀</button>
+          <button id="btn-tts-next"  type="button" title="Próximo bloco">▶</button>
+          <button id="btn-tts-sel"   type="button" title="Ler apenas seleção">Ler seleção</button>
+          <button id="btn-tts-stop"  type="button" title="Parar voz">Parar</button>
+          <small data-tts-status>Pronto.</small>
+        `;
+      document.body.appendChild(wrap);
+      btnT   = wrap.querySelector('#btn-tts');
+      btnS   = wrap.querySelector('#btn-tts-sel');
+      btnX   = wrap.querySelector('#btn-tts-stop');
+      btnPrev= wrap.querySelector('#btn-tts-prev');
+      btnNext= wrap.querySelector('#btn-tts-next');
+      status = wrap.querySelector('[data-tts-status]');
+    }else if(DOCKED){
+      const w = btnT.closest('.kob-tts-panel'); if(w) w.classList.add('is-dock');
+      btnT.textContent='🔊'; if(btnPrev) btnPrev.textContent='◀'; if(btnNext) btnNext.textContent='▶';
+      btnS.textContent='✂︎'; btnX.textContent='■';
+    }
+
+    return {wrap, btnT, btnS, btnX, btnPrev, btnNext, status};
+  };
+
+  // ——— Toast seguro ———
+  const toastSafe = (msg)=> { try{ if(typeof window.toast==='function') window.toast(msg); }catch(e){} };
+
+  // ——— Voz ———
+  let voice = null;
+  const pickVoice = ()=>{
+    const vs = synth.getVoices() || [];
+    return vs.find(v=>/pt[-_]BR/i.test(v.lang))
+        || vs.find(v=>/pt/i.test(v.lang))
+        || vs[0] || null;
+  };
+  const ensureVoice = ()=> { if(!voice) voice = pickVoice(); };
+  synth.onvoiceschanged = ()=> { if(!voice) voice = pickVoice(); };
+
+  // ——— Estado TTS ———
+  let blocks = [];        // [{ node, text }]
+  let currentIndex = 0;
+  let speaking = false;
+  let utterance = null;
+  let errorStreak = 0;
+  const MAX_ERRORS = 3;
+
+  // ——— Utils ———
+  const setLabel = (btn, on)=>{
+    if(!btn) return;
+    if(DOCKED){ btn.setAttribute('aria-pressed', on ? 'true' : 'false'); btn.textContent = '🔊'; }
+    else{ btn.textContent = 'Voz: ' + (on ? 'On' : 'Off'); }
+  };
+  const setStatus = (el, txt)=> { if(el) el.textContent = txt; };
+  const clearHighlight = ()=> document.querySelectorAll('[data-tts-current]').forEach(el=>el.removeAttribute('data-tts-current'));
+  const highlightCurrent = ()=>{
+    clearHighlight();
+    if(!blocks.length) return;
+    const b = blocks[currentIndex]; if(!b || !b.node) return;
+    b.node.setAttribute('data-tts-current','true');
+    try{ b.node.scrollIntoView({behavior:'smooth', block:'center'});}catch(e){}
+  };
+
+  const BUILD_NODE_SEL = [
+    'h1','h2','h3','h4','h5','h6',
+    'p','li','blockquote','.callout',
+    'pre.md-code','codeblock','table.md-table td','table.md-table th'
+  ].join(',');
+
+  const buildBlocksFromDOM = ()=>{
+    const root = getRoot();
+    const nodes = root.querySelectorAll(BUILD_NODE_SEL);
+    const list = [];
+    nodes.forEach(node=>{
+      let text = (node.innerText || '').replace(/\bCopiar\b/g,'').trim();
+      if(!text) return;
+      list.push({ node, text });
+    });
+    blocks = list;
+    currentIndex = 0;
+    errorStreak = 0;
+    setStatus(ui.status, blocks.length ? `TTS pronto: ${blocks.length} blocos.` : 'Nenhum bloco válido.');
+    if(blocks.length) toastSafe('TTS pronto: ' + blocks.length + ' blocos');
+  };
+
+  const stopInternal = ()=>{
+    speaking = false; errorStreak = 0;
+    try{ synth.cancel(); }catch(e){}
+    if(utterance){ try{ utterance.onend=null; utterance.onerror=null; }catch(e){}; utterance=null; }
+    clearHighlight(); setLabel(ui.btnT, false); setStatus(ui.status, 'TTS parado.');
+  };
+
+  const speakCurrent = ()=>{
+    if(!blocks.length) buildBlocksFromDOM();
+    if(!blocks.length){ stopInternal(); return; }
+
+    if(currentIndex < 0) currentIndex = 0;
+    if(currentIndex >= blocks.length){ stopInternal(); toastSafe('Fim dos blocos'); return; }
+
+    const b = blocks[currentIndex];
+    if(!b || !b.text || !b.text.trim()){
+      errorStreak++;
+      if(errorStreak > MAX_ERRORS){ toastSafe('Muitos blocos vazios/erro. Pausado.'); stopInternal(); return; }
+      currentIndex++; speakCurrent(); return;
+    }
+
+    try{ synth.cancel(); }catch(e){}
+    ensureVoice();
+
+    utterance = new SpeechSynthesisUtterance(b.text.trim());
+    if(voice) utterance.voice = voice;
+    utterance.lang = (voice && voice.lang) || 'pt-BR';
+    utterance.rate = 1.0; utterance.pitch = 1.0; utterance.volume = 1.0;
+
+    utterance.onend   = ()=>{ if(!speaking) return; currentIndex++; speakCurrent(); };
+    utterance.onerror = ()=>{ if(!speaking) return; errorStreak++; (errorStreak>MAX_ERRORS)?(toastSafe('Erros seguidos. Pausado.'), stopInternal()):(currentIndex++, speakCurrent()); };
+
+    highlightCurrent();
+    setStatus(ui.status, `Lendo ${currentIndex+1}/${blocks.length}…`);
+    synth.speak(utterance);
+  };
+
+  // ——— Controles ———
+  const toggle = ()=>{
+    if(speaking){ stopInternal(); toastSafe('Voz desativada'); return; }
+    speaking = true; setLabel(ui.btnT, true);
+    if(!blocks.length) buildBlocksFromDOM();
+    speakCurrent(); toastSafe('Voz ativada');
+  };
+  const speakSelection = ()=>{
+    const text = (window.getSelection && String(window.getSelection())) || '';
+    const t = text.trim();
+    if(!t){ toastSafe('Selecione um trecho primeiro'); return; }
+    ensureVoice(); try{ synth.cancel(); }catch(e){}
+    const u = new SpeechSynthesisUtterance(t);
+    if(voice) u.voice = voice;
+    u.lang = (voice && voice.lang) || 'pt-BR';
+    u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+    synth.speak(u);
+  };
+  const nextBlock = ()=>{ if(!blocks.length) buildBlocksFromDOM(); speaking = true; setLabel(ui.btnT, true); currentIndex++; speakCurrent(); };
+  const prevBlock = ()=>{ if(!blocks.length) buildBlocksFromDOM(); speaking = true; setLabel(ui.btnT, true); currentIndex = Math.max(0, currentIndex-1); speakCurrent(); };
+
+  // ——— Auto-wire: botões externos "TTS" / "ouvir TTS" ———
+  const isTTSLabel = (el)=>{
+    const t = (el.textContent||'').toLowerCase().replace(/\s+/g,' ').trim();
+    return /\btts\b/.test(t) || t.includes('ouvir tts');
+  };
+  const bindExternal = (root=document)=>{
+    const candidates = Array.from(root.querySelectorAll('button, a, [role="button"], .btn, .button'))
+      .filter(el=>!el.dataset.kobTtsBound && isTTSLabel(el));
+    candidates.forEach(el=>{
+      el.dataset.kobTtsBound = '1';
+      el.addEventListener('click', (e)=>{ e.preventDefault(); toggle(); }, { passive:false });
+      el.title = (el.title||'') || 'Ativar/Desativar TTS';
+    });
+  };
+  const mo = new MutationObserver((muts)=>{
+    for(const m of muts){
+      if(m.addedNodes) m.addedNodes.forEach(n=>{ if(n.nodeType===1) bindExternal(n); });
+    }
+  });
+
+  // ——— Drag + persistência ———
+  const applySavedDockPos = ()=>{
     try{
-      const s = JSON.parse(localStorage.getItem(POS_KEY)||'null');
-      if(s){ setPos(s.L, s.B); }
+      const saved = JSON.parse(localStorage.getItem(POS_KEY)||'null');
+      if(saved && typeof saved.left==='number' && typeof saved.bottom==='number'){
+        document.documentElement.style.setProperty('--tts-dock-left', `${saved.left}px`);
+        document.documentElement.style.setProperty('--tts-dock-bottom', `${saved.bottom}px`);
+      }
     }catch(e){}
+  };
+  const enableDrag = (wrap)=>{
+    if(!DRAG_ENABLED || !wrap) return;
+    let startX=0, startY=0, startLeft=0, startBottom=0, dragging=false;
 
     const onDown = (ev)=>{
       const e = ev.touches ? ev.touches[0] : ev;
-      toggle.classList.add('is-drag');
-      moved=false; sx=e.clientX; sy=e.clientY;
-      const c = cs();
-      sl = parseFloat(c.getPropertyValue('--idtts-left'))||10;
-      sb = parseFloat(c.getPropertyValue('--idtts-bottom'))||200;
+      dragging=true; wrap.classList.add('is-dragging');
+      startX = e.clientX; startY = e.clientY;
+      const cs = getComputedStyle(document.documentElement);
+      startLeft   = parseFloat(cs.getPropertyValue('--tts-dock-left')) || 8;
+      startBottom = parseFloat(cs.getPropertyValue('--tts-dock-bottom')) || 269;
       window.addEventListener('pointermove', onMove, {passive:false});
-      window.addEventListener('pointerup',   onUp,   {passive:false});
-      window.addEventListener('touchmove',   onMove, {passive:false});
-      window.addEventListener('touchend',    onUp,   {passive:false});
+      window.addEventListener('pointerup', onUp, {passive:false});
+      window.addEventListener('touchmove', onMove, {passive:false});
+      window.addEventListener('touchend', onUp, {passive:false});
     };
     const onMove = (ev)=>{
+      if(!dragging) return;
       const e = ev.touches ? ev.touches[0] : ev;
-      const dx = e.clientX - sx;
-      const dy = e.clientY - sy;
-      if(Math.abs(dx)>6 || Math.abs(dy)>6) moved=true;
-      setPos(sl + dx, sb - dy); /* mover p/ cima = aumenta bottom */
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const left = Math.max(0, startLeft + dx);
+      const bottom = Math.max(0, startBottom - dy); // mover para cima aumenta bottom
+      document.documentElement.style.setProperty('--tts-dock-left', `${left}px`);
+      document.documentElement.style.setProperty('--tts-dock-bottom', `${bottom}px`);
     };
     const onUp = ()=>{
-      toggle.classList.remove('is-drag');
+      if(!dragging) return;
+      dragging=false; wrap.classList.remove('is-dragging');
+      const cs = getComputedStyle(document.documentElement);
+      const left   = parseFloat(cs.getPropertyValue('--tts-dock-left')) || 8;
+      const bottom = parseFloat(cs.getPropertyValue('--tts-dock-bottom')) || 269;
+      try{ localStorage.setItem(POS_KEY, JSON.stringify({left,bottom})); }catch(e){}
       window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup',   onUp);
-      window.removeEventListener('touchmove',   onMove);
-      window.removeEventListener('touchend',    onUp);
-      savePos();
-      if(!moved){
-        const c = p.getAttribute('data-collapsed')==='1' ? '0':'1';
-        p.setAttribute('data-collapsed', c);
-        localStorage.setItem('infodocs_tts_collapsed', c);
-      }
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
     };
-    toggle.addEventListener('pointerdown', onDown);
-    toggle.addEventListener('touchstart',  onDown);
 
-    const grp = document.createElement('div');
-    grp.className = 'infodocs-tts__group';
-    grp.innerHTML = `
-      <button class="infodocs-tts__btn" id="idtts-play" aria-pressed="false" title="Voz On/Off">
-        <svg class="svg-icon-29"><use href="#id-ic-spk"></use></svg>
-      </button>
-      <button class="infodocs-tts__btn" id="idtts-prev"  title="Anterior">
-        <svg class="svg-icon-29"><use href="#id-ic-prev"></use></svg>
-      </button>
-      <button class="infodocs-tts__btn" id="idtts-next"  title="Próximo">
-        <svg class="svg-icon-29"><use href="#id-ic-next"></use></svg>
-      </button>
-      <button class="infodocs-tts__btn" id="idtts-sel"   title="Ler seleção">
-        <svg class="svg-icon-29"><use href="#id-ic-cut"></use></svg>
-      </button>
-      <button class="infodocs-tts__btn" id="idtts-stop"  title="Parar">
-        <svg class="svg-icon-29"><use href="#id-ic-stop"></use></svg>
-      </button>
-      <small data-tts-status></small>
-    `;
-    p.append(toggle, grp);
-    document.body.appendChild(p);
-    return p;
-  })();
-
-  /* Voz */
-  let voice=null;
-  const pickVoice=()=> (synth.getVoices()||[]).find(v=>/pt[-_]BR/i.test(v.lang)) || (synth.getVoices()||[]).find(v=>/pt/i.test(v.lang)) || (synth.getVoices()||[])[0] || null;
-  synth.onvoiceschanged = ()=>{ if(!voice) voice = pickVoice(); };
-
-  /* Estado */
-  let blocks=[], idx=0, speaking=false, utter=null, errors=0;
-  const MAX_ERRORS=3;
-
-  const statusEl = ()=> panel.querySelector('[data-tts-status]');
-  const btnPlay  = ()=> panel.querySelector('#idtts-play');
-  const setPlay  = (on)=>{ const b=btnPlay(); b && b.setAttribute('aria-pressed', on?'true':'false'); };
-
-  /* STATUS compacto: empilha “atual / total” em 3 linhas */
-  const setStatusCount = (curr,total)=>{
-    const s = statusEl(); if(!s) return;
-    s.innerHTML = `<span class="s1">${curr}</span><span class="s2">/</span><span class="s3">${total}</span>`;
+    wrap.addEventListener('pointerdown', onDown);
+    wrap.addEventListener('touchstart', onDown);
   };
 
-  const clearHL = ()=> document.querySelectorAll('[data-tts-current]').forEach(el=>el.removeAttribute('data-tts-current'));
-  const highlight = ()=> { clearHL(); const b=blocks[idx]; if(b&&b.node){ b.node.setAttribute('data-tts-current','true'); try{ b.node.scrollIntoView({behavior:'smooth', block:'center'});}catch(e){} } };
+  // ——— Boot ———
+  let ui = {wrap:null,btnT:null,btnS:null,btnX:null,status:null,btnPrev:null,btnNext:null};
 
-  const NODE_SEL = ['h1','h2','h3','h4','h5','h6','p','li','blockquote','.callout','.equation','pre.md-code','td','th'].join(',');
+  const boot = ()=>{
+    applySavedDockPos();
+    const got = ensurePanel();
+    ui = {
+      wrap:   got.wrap,
+      btnT:   got.btnT,
+      btnS:   got.btnS,
+      btnX:   got.btnX,
+      status: got.status,
+      btnPrev: got.btnPrev,
+      btnNext: got.btnNext,
+    };
+    setLabel(ui.btnT,false);
+    setStatus(ui.status,'Pronto.');
 
-  function rebuild(){
-    const root = getRoot();
-    const nodes = root.querySelectorAll(NODE_SEL);
-    const list=[];
-    nodes.forEach(n=>{ const txt=(n.innerText||'').replace(/\bCopiar\b/g,'').trim(); if(txt) list.push({node:n,text:txt}); });
-    blocks=list; idx=0; errors=0;
-    setStatusCount(0, blocks.length||0);
+    // binds painel
+    ui.btnT   && ui.btnT.addEventListener('click', e=>{e.preventDefault(); toggle();});
+    ui.btnS   && ui.btnS.addEventListener('click', e=>{e.preventDefault(); speakSelection();});
+    ui.btnX   && ui.btnX.addEventListener('click', e=>{e.preventDefault(); stopInternal();});
+    ui.btnPrev&& ui.btnPrev.addEventListener('click', e=>{e.preventDefault(); prevBlock();});
+    ui.btnNext&& ui.btnNext.addEventListener('click', e=>{e.preventDefault(); nextBlock();});
+
+    // teclado opcional (←/→)
+    window.addEventListener('keydown', (ev)=>{
+      if(ev.target && /input|textarea/i.test(ev.target.tagName)) return;
+      if(ev.key==='ArrowRight'){ nextBlock(); }
+      if(ev.key==='ArrowLeft'){ prevBlock(); }
+    });
+
+    // integra com ACTIONS (compat)
+    window.ACTIONS = window.ACTIONS || {};
+    const oldTTS = window.ACTIONS.tts;
+    window.ACTIONS.tts = ()=>{ try{ toggle(); }catch(e){}; if(typeof oldTTS==='function'){ /* compat */ } };
+    window.ACTIONS.ttsPrev = ()=>{ prevBlock(); };
+    window.ACTIONS.ttsNext = ()=>{ nextBlock(); };
+    window.ACTIONS.ttsStop = ()=>{ stopInternal(); };
+
+    // expõe API global
+    window.KOBLLUX_TTS = {
+      rebuild: ()=>buildBlocksFromDOM(),
+      play: ()=>{ if(!speaking){ speaking=true; setLabel(ui.btnT,true); } speakCurrent(); },
+      stop: stopInternal,
+      next: nextBlock,
+      prev: prevBlock,
+      info: ()=>({ blocks:blocks.length, currentIndex, speaking })
+    };
+
+    // Auto-wire em botões externos
+    bindExternal(document);
+    mo.observe(document.documentElement, {childList:true, subtree:true});
+
+    // Drag opcional
+    if(DOCKED && DRAG_ENABLED){ enableDrag(ui.wrap); }
+  };
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', boot, { once:true });
+  }else{
+    boot();
   }
-
-  function stop(){
-    speaking=false; errors=0;
-    try{ synth.cancel(); }catch(e){}
-    if(utter){ try{ utter.onend=null; utter.onerror=null; }catch(e){}; utter=null; }
-    clearHL(); setPlay(false); setStatusCount(0, blocks.length||0);
-  }
-
-  function speakCurrent(){
-    if(!blocks.length) rebuild();
-    if(!blocks.length){ stop(); return; }
-    if(idx<0) idx=0;
-    if(idx>=blocks.length){ stop(); return; }
-
-    const b = blocks[idx];
-    if(!b || !b.text || !b.text.trim()){
-      if(++errors>MAX_ERRORS){ stop(); return; }
-      idx++; speakCurrent(); return;
-    }
-    try{ synth.cancel(); }catch(e){}
-    if(!voice) voice = pickVoice();
-
-    utter = new SpeechSynthesisUtterance(b.text.trim());
-    if(voice) utter.voice = voice;
-    utter.lang=(voice&&voice.lang)||'pt-BR'; utter.rate=1; utter.pitch=1; utter.volume=1;
-    utter.onend   = ()=>{ if(!speaking) return; idx++; setStatusCount(idx, blocks.length); speakCurrent(); };
-    utter.onerror = ()=>{ if(!speaking) return; if(++errors>MAX_ERRORS){ stop(); } else { idx++; setStatusCount(idx, blocks.length); speakCurrent(); } };
-
-    highlight(); setStatusCount(idx+1, blocks.length); synth.speak(utter);
-  }
-
-  function toggle(){ if(speaking){ stop(); return; } speaking=true; setPlay(true); if(!blocks.length) rebuild(); speakCurrent(); }
-  function next(){ if(!blocks.length) rebuild(); speaking=true; setPlay(true); idx++; speakCurrent(); }
-  function prev(){ if(!blocks.length) rebuild(); speaking=true; setPlay(true); idx=Math.max(0,idx-1); speakCurrent(); }
-  function sel(){
-    const t = (window.getSelection && String(window.getSelection())) || '';
-    const m = t.trim(); if(!m) return;
-    try{ synth.cancel(); }catch(e){}
-    if(!voice) voice = pickVoice();
-    const u = new SpeechSynthesisUtterance(m);
-    if(voice) u.voice = voice; u.lang=(voice&&voice.lang)||'pt-BR'; u.rate=1; u.pitch=1; u.volume=1; synth.speak(u);
-  }
-
-  /* binds */
-  panel.querySelector('#idtts-play')?.addEventListener('click', e=>{ e.preventDefault(); toggle(); });
-  panel.querySelector('#idtts-prev')?.addEventListener('click', e=>{ e.preventDefault(); prev(); });
-  panel.querySelector('#idtts-next')?.addEventListener('click', e=>{ e.preventDefault(); next(); });
-  panel.querySelector('#idtts-sel') ?.addEventListener('click', e=>{ e.preventDefault(); sel();  });
-  panel.querySelector('#idtts-stop')?.addEventListener('click', e=>{ e.preventDefault(); stop(); });
-
-  /* integra com ACTIONS do seu index onipotente */
-  window.ACTIONS = window.ACTIONS || {};
-  const A = window.ACTIONS;
-  const wrap = (fn, after)=> function(){ try{ return fn && fn.apply(this, arguments); } finally { try{ after && after(); }catch(e){} } };
-  if(A.gerar)  A.gerar  = wrap(A.gerar,  ()=> setTimeout(rebuild, 50));
-  if(A.nested) A.nested = wrap(A.nested, ()=> setTimeout(rebuild, 50));
-  A.tts       = ()=> toggle();
-  A['tts-prev']= ()=> prev();
-  A['tts-next']= ()=> next();
-  A['tts-sel'] = ()=> sel();
-  A['tts-stop']= ()=> stop();
-
-  /* boot */
-  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', rebuild, {once:true}); }
-  else { rebuild(); }
 })();
 </script>
+<!-- /KOBLLUX :: PATCH ÚNICO — TTS por Blocos -->
 
 </body></html>
