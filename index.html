@@ -3577,8 +3577,8 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
   }
   function sanitize(txt,type){
     let s = stripKaTeX(txt||'');
-    s = s.replace(/[\\/|*_=`~^<>#{}$begin:math:display$$end:math:display$()+\-]+/g, ' ');
-    s = s.replace(/:+/g, ', ').replace(/\.+/g, ', ');
+    // s = s.replace(/[\\/|*_=`~^<>#{}$begin:math:display$$end:math:display$()+\-]+/g, ' ');
+    // s = s.replace(/:+/g, ', ').replace(/\.+/g, ', ');
     s = s.replace(/\s{2,}/g,' ').trim();
     if(type==='code')     return 'Bloco de código com ' + (txt.split(/\n/).length) + ' linhas.';
     if(type==='equation') return 'Equação matemática.';
