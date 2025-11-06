@@ -6,8 +6,8 @@
 <title>Portal — Livro Vivo</title>
 <meta name="theme-color" content="#0a0e18" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="icons/icon-192.PNG" />
-<link rel="apple-touch-icon" href="icons/icon-192.PNG" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <meta name="color-scheme" content="dark"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
@@ -3291,5 +3291,577 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
 })();
 </script>
 <!-- /KOBLLUX :: PATCH ÚNICO — TTS por Blocos -->
+
+<!-- KOBLLUX :: PATCH ÚNICO — DOCK LATERAL COMPACTA (mapeada) -->
+<style>
+  :root{ --dock-size: 52px; --dock-radius: 14px; }
+  @media (max-width: 768px){
+    :root{ --dock-size: 48px; --dock-radius: 12px; }
+  }
+
+  /* se quiser manter o painel antigo, remova a linha abaixo */
+  .kob-tts-panel{ display:none !important; }
+
+  .dock-lateral {
+    position: fixed;
+    left: max(10px, env(safe-area-inset-left));
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9999;
+    pointer-events: auto;
+  }
+  .dock-lateral .dock-btn {
+    width: var(--dock-size);
+    height: var(--dock-size);
+    border-radius: var(--dock-radius);
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.14);
+    box-shadow:
+      0 10px 26px rgba(0,255,220,.16),
+      inset 0 1px 0 rgba(255,255,255,.08);
+    backdrop-filter: blur(10px) saturate(1.15);
+    -webkit-backdrop-filter: blur(10px) saturate(1.15);
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .dock-lateral .dock-btn:hover { transform: translateY(-2px); }
+  .dock-lateral .dock-btn:active { transform: translateY(0); }
+  .dock-lateral .dock-btn svg {
+    width: calc(var(--dock-size) * .48);
+    height: calc(var(--dock-size) * .48);
+    stroke: rgba(230,255,255,.94);
+    fill: none; stroke-width: 2.1;
+    filter: drop-shadow(0 0 5px rgba(0,255,240,.35));
+  }
+  .dock-lateral .dock-btn.is-on{
+    box-shadow:
+      0 0 0 2px rgba(0,255,240,.32),
+      0 16px 36px rgba(0,255,220,.30),
+      inset 0 0 14px rgba(0,255,240,.18);
+    background: radial-gradient(120% 120% at 12% 12%,
+      rgba(0,255,240,.16), rgba(255,255,255,.05) 52%, rgba(255,255,255,.04));
+  }
+
+  /* destaque do bloco atual do TTS */
+  [data-tts-current]{
+    outline:2px dashed rgba(76,240,255,.9);
+    background:rgba(76,240,255,.06);
+    border-radius:10px;
+    transition:background .25s ease, outline .25s ease;
+  }
+</style>
+
+<div class="dock-lateral" data-dock="tts">
+  <!-- TOGGLE VOZ -->
+  <button class="dock-btn" id="dock-tts-toggle" aria-label="Ativar voz">
+    <svg viewBox="0 0 24 24">
+      <path d="M4 10v4h4l5 4V6l-5 4H4z"></path>
+      <path d="M15 9a3 3 0 0 1 0 6"></path>
+      <path d="M17.5 6.5a6 6 0 0 1 0 11"></path>
+    </svg>
+  </button>
+  <!-- ANTERIOR -->
+  <button class="dock-btn" id="dock-tts-prev" aria-label="Bloco anterior">
+    <svg viewBox="0 0 24 24"><path d="M15 6l-8 6 8 6V6z"></path></svg>
+  </button>
+  <!-- SELEÇÃO -->
+  <button class="dock-btn" id="dock-tts-sel" aria-label="Ler seleção">
+    <svg viewBox="0 0 24 24">
+      <path d="M4 7l7 7"></path><path d="M11 7l-7 7"></path>
+      <path d="M14 5h6"></path><path d="M14 19h6"></path>
+    </svg>
+  </button>
+  <!-- PARAR -->
+  <button class="dock-btn" id="dock-tts-stop" aria-label="Parar voz">
+    <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" ry="2"></rect></svg>
+  </button>
+</div>
+
+<script>
+(()=>{ // Dock Lateral mapeada nos botões existentes
+  const $ = (s)=>document.querySelector(s);
+  const btnToggle = $('#dock-tts-toggle');
+  const btnPrev   = $('#dock-tts-prev');
+  const btnSel    = $('#dock-tts-sel');
+  const btnStop   = $('#dock-tts-stop');
+
+  // possíveis alvos já existentes no app
+  const map = {
+    toggle: document.getElementById('btn-tts')
+         || document.querySelector('[data-action="tts"]')
+         || document.querySelector('.btn-emoji-tts,[data-emoji="speaker"],[data-emoji="tts"]'),
+    prev:   document.getElementById('btn-tts-prev')
+         || document.querySelector('[data-action="ttsPrev"]'),
+    sel:    document.getElementById('btn-tts-sel')
+         || document.querySelector('[data-action="ttsSel"]'),
+    stop:   document.getElementById('btn-tts-stop')
+         || document.querySelector('[data-action="ttsStop"]'),
+  };
+
+  // helpers
+  const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+  const pickVoice = ()=>{
+    if(!synth) return null;
+    const vs = synth.getVoices() || [];
+    return vs.find(v=>/pt[-_]BR/i.test(v.lang)) || vs.find(v=>/pt/i.test(v.lang)) || vs[0] || null;
+  };
+  const speakSelectionFallback = ()=>{
+    if(!synth) return;
+    const text = (window.getSelection && String(window.getSelection())) || '';
+    const t = text.trim(); if(!t) return;
+    try{ synth.cancel(); }catch(e){}
+    const u = new SpeechSynthesisUtterance(t);
+    const v = pickVoice(); if(v) u.voice = v;
+    u.lang = (v && v.lang) || 'pt-BR';
+    synth.speak(u);
+  };
+
+  function clickOrAction(el, actionName, fallback){
+    if(el){ el.dispatchEvent(new Event('click', {bubbles:true})); return; }
+    // tenta ACTIONS
+    if(window.ACTIONS && typeof window.ACTIONS[actionName]==='function'){ window.ACTIONS[actionName](); return; }
+    // tenta API direta do TTS
+    if(window.KOBLLUX_TTS){
+      try{ fallback(window.KOBLLUX_TTS); }catch(e){}
+    }
+  }
+
+  btnToggle?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    clickOrAction(map.toggle, 'tts', (api)=>{
+      const info = api.info?.()||{};
+      info.speaking ? api.stop() : api.play();
+    });
+  });
+  btnPrev?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    clickOrAction(map.prev, 'ttsPrev', (api)=>api.prev?.());
+  });
+  btnSel?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    if(map.sel){ map.sel.dispatchEvent(new Event('click', {bubbles:true})); return; }
+    speakSelectionFallback();
+  });
+  btnStop?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    clickOrAction(map.stop, 'ttsStop', (api)=>api.stop?.());
+  });
+
+  // estado visual (glow) sincronizado
+  function refreshState(){
+    try{
+      const info = window.KOBLLUX_TTS?.info?.();
+      btnToggle?.classList.toggle('is-on', !!(info && info.speaking));
+    }catch(e){}
+  }
+  setInterval(refreshState, 900);
+  setTimeout(refreshState, 200);
+})();
+</script>
+<!-- /KOBLLUX :: PATCH ÚNICO — DOCK LATERAL COMPACTA -->
+
+<!-- KOBLLUX :: PATCH ÚNICO — TTS v3 (Reset + Outline + ASCII + Archetypes) -->
+<style>
+  /* (opcional) desligar qualquer TTS legado que esteja por baixo */
+  .tts-panel, #ttsDock, [data-legacy-tts] { display:none !important; }
+
+  :root{
+    --tts-btn-size: 29px;      /* ✔ tamanho pedido */
+    --tts-gap: 8px;
+    --tts-left: 8px;
+    --tts-bottom: 240px;
+    --tts-ink: rgba(255,255,255,.92);
+    --tts-ink-dim: rgba(255,255,255,.70);
+    --tts-glass: rgba(15,18,28,.40);
+    --tts-brd: rgba(255,255,255,.14);
+    --tts-glow: rgba(76,240,255,.85);
+  }
+
+  /* Dock minimalista (29px) — mobile-first */
+  .kob-tts-dock{
+    position:fixed; left:var(--tts-left); bottom:calc(var(--tts-bottom) + env(safe-area-inset-bottom,0px));
+    z-index:9999; display:flex; flex-direction:column; gap:var(--tts-gap);
+    padding:6px; border-radius:14px; background:var(--tts-glass);
+    border:1px solid var(--tts-brd);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: 0 12px 28px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.05);
+    touch-action:none; cursor:grab;
+  }
+  .kob-tts-dock.is-drag{ cursor:grabbing; }
+
+  .kob-tts-dock button{
+    width:var(--tts-btn-size); height:var(--tts-btn-size);
+    border-radius:10px; border:1px solid rgba(255,255,255,.18);
+    display:grid; place-items:center; font:700 16px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color:var(--tts-ink-dim);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.02)) padding-box,
+      linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04)) border-box;
+    transition: transform .15s ease, color .15s ease, box-shadow .15s ease;
+    cursor:pointer;
+  }
+  .kob-tts-dock button:hover{ transform: translateY(-1px); color:var(--tts-ink); }
+  .kob-tts-dock button[aria-pressed="true"]{
+    color:var(--tts-ink);
+    outline:2px solid color-mix(in srgb, var(--tts-glow) 70%, #00e28b 30%);
+    box-shadow: 0 0 16px -2px var(--tts-glow), inset 0 0 0 1px rgba(255,255,255,.10);
+  }
+  .kob-tts-dock small{
+    color:var(--tts-ink); font-size:10px; opacity:.78; max-width:140px;
+    display:block; line-height:1.15;
+    word-break: break-word;            /* quebra em várias linhas p/ não poluir */
+  }
+
+  /* Destaque do bloco atual + overlay grade */
+  [data-tts-current]{ outline:2px dashed var(--tts-glow); outline-offset:2px; border-radius:8px; }
+  #kob-tts-outline{
+    position:absolute; z-index:9998; pointer-events:none; border-radius:10px;
+    border:2px dashed color-mix(in srgb, var(--tts-glow) 70%, #00e28b 30%);
+    background:
+      repeating-linear-gradient(0deg, color-mix(in srgb, var(--tts-glow) 10%, transparent) 0 6px, transparent 6px 12px),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--tts-glow) 10%, transparent) 0 6px, transparent 6px 12px);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 10px 26px rgba(0,0,0,.35);
+    display:none;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .kob-tts-dock, .kob-tts-dock button{ transition:none !important; }
+  }
+  @media print{ .kob-tts-dock, #kob-tts-outline { display:none !important; } }
+</style>
+
+<script>
+(()=>{ if(window.__KOB_TTS_V3_ACTIVE) return; window.__KOB_TTS_V3_ACTIVE = true;
+
+  /* ---------- Config geral ---------- */
+  const POS_KEY = 'kob_tts_pos_v3';
+  const PREF_KEY = 'kob_tts_prefs_v3';
+  const SELS_ROOT = ['#root','[data-analyzer-output]','.analyzer-output','#render','main','.content'];
+  const BLOCK_SEL = [
+    'h1','h2','h3','h4','h5','h6',
+    'p','li','blockquote','.callout','.equation','pre','td','th','codeblock'
+  ].join(',');
+
+  const PREFS = Object.assign({
+    outline: true,
+    asciiMode: 'describe',  // 'describe' | 'skip' | 'read' (padrão: descrever)
+  }, readPrefs());
+
+  /* ---------- Painel (29px) ---------- */
+  const dock = document.createElement('div');
+  dock.className = 'kob-tts-dock';
+  dock.innerHTML = `
+    <button id="tts-on"    title="Ativar/Desativar" aria-pressed="false">🔊</button>
+    <button id="tts-prev"  title="Anterior">◀</button>
+    <button id="tts-next"  title="Próximo">▶</button>
+    <button id="tts-sel"   title="Ler seleção">✂︎</button>
+    <button id="tts-stop"  title="Parar voz">■</button>
+    <button id="tts-reset" title="Reset (memória/página)">↻</button>
+    <button id="tts-grid"  title="Outline/Grade">⌗</button>
+    <small id="tts-status">Pronto.</small>
+  `;
+  document.body.appendChild(dock);
+
+  /* Outline overlay (grade) */
+  const outline = document.createElement('div');
+  outline.id = 'kob-tts-outline';
+  document.body.appendChild(outline);
+
+  /* Drag + lembrar posição */
+  applySavedPos();
+  (()=>{ let sx=0, sy=0, sl=0, sb=0, drag=false;
+    const onDown = (ev)=>{ const e=ev.touches?ev.touches[0]:ev; drag=true; dock.classList.add('is-drag'); sx=e.clientX; sy=e.clientY;
+      const cs=getComputedStyle(document.documentElement);
+      sl=parseFloat(cs.getPropertyValue('--tts-left'))||8;
+      sb=parseFloat(cs.getPropertyValue('--tts-bottom'))||240;
+      window.addEventListener('pointermove',onMove,{passive:false});
+      window.addEventListener('pointerup',onUp,{passive:false});
+      window.addEventListener('touchmove',onMove,{passive:false});
+      window.addEventListener('touchend',onUp,{passive:false});
+    };
+    const onMove=(ev)=>{ if(!drag) return; const e=ev.touches?ev.touches[0]:ev;
+      const dx=e.clientX-sx, dy=e.clientY-sy;
+      setCSS('--tts-left', Math.max(0, sl+dx) + 'px');
+      setCSS('--tts-bottom', Math.max(0, sb-dy) + 'px');
+    };
+    const onUp=()=>{ if(!drag) return; drag=false; dock.classList.remove('is-drag'); savePos(); };
+    dock.addEventListener('pointerdown',onDown); dock.addEventListener('touchstart',onDown);
+  })();
+
+  /* ---------- Vozes e estilos por arquétipo ---------- */
+  const synth = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+  let VOICES = []; let baseVoice = null;
+  const ARCH_STYLES = {
+    atlas:   { rate:.95, pitch:1.00, find:/\b(atlas)\b/i },
+    nova:    { rate:1.12, pitch:1.12, find:/\b(nova)\b/i },
+    vitalis: { rate:1.08, pitch:1.05, find:/\b(vitalis)\b/i },
+    pulse:   { rate:1.04, pitch:1.08, find:/\b(pulse|pulso)\b/i },
+    serena:  { rate:.98, pitch:.96,  find:/\b(serena)\b/i },
+    kaos:    { rate:1.18, pitch:1.02, find:/\b(kaos)\b/i },
+    genus:   { rate:1.00, pitch:1.00, find:/\b(genus)\b/i },
+    lumine:  { rate:1.06, pitch:1.10, find:/\b(lumine)\b/i },
+    rhea:    { rate:.97, pitch:1.00, find:/\b(rhea)\b/i },
+    solus:   { rate:.93, pitch:.95,  find:/\b(solus)\b/i },
+    aion:    { rate:1.00, pitch:1.08, find:/\b(aion)\b/i },
+  };
+  function loadVoices(){ VOICES = synth?.getVoices?.() || []; if(!baseVoice){ baseVoice = pickPTBR(VOICES); } }
+  function pickPTBR(list){ return (list||[]).find(v=>/pt[-_]?BR/i.test(v.lang)) || (list||[]).find(v=>/pt/i.test(v.lang)) || (list||[])[0] || null; }
+  if(synth){ loadVoices(); synth.onvoiceschanged = ()=> loadVoices(); }
+
+  /* ---------- Estado de leitura ---------- */
+  let blocks = [];           // [{node, text, type, sectionIdx}]
+  let idx = 0;
+  let speaking = false;
+  let u = null;
+
+  /* ---------- Helpers ---------- */
+  const $ = (q, r=document)=> r.querySelector(q);
+  function setCSS(varName, val){ document.documentElement.style.setProperty(varName, val); }
+  function toast(m){ try{ window.toast && window.toast(m); }catch(e){} }
+  function setPressed(btn, on){ btn?.setAttribute('aria-pressed', on?'true':'false'); }
+  function setStatus(t){ const el=$('#tts-status', dock); if(el) el.textContent = t; }
+  function getRoot(){ for(const s of SELS_ROOT){ const el=document.querySelector(s); if(el) return el; } return document.body; }
+  function isAsciiArt(txt){
+    const lines = txt.split(/\n/);
+    const raw = txt.replace(/\s+/g,'');
+    const nonWordRatio = (raw.replace(/[A-Za-zÀ-ÿ0-9]/g,'').length) / (raw.length||1);
+    const boxChars = /[░▒▓█▀▄▌▐─═║╔╗╝╚╩╦╠╣┌┐└┘]/.test(txt);
+    const longWide = lines.some(l => l.length > 28 && l.replace(/[A-Za-zÀ-ÿ0-9]/g,'').length / (l.length||1) > .45);
+    return boxChars || nonWordRatio > .42 || longWide;
+  }
+  function describeAscii(txt){
+    const t = txt || '';
+    const hasBlock = /[█▓▒░]{4,}/.test(t);
+    const hasLines = /[─═]{4,}/.test(t);
+    const hasGrid  = /[┼╬╦╩╠╣]/.test(t);
+    const hasTri   = /[△▲▵]/.test(t);
+    const hasCirc  = /[○●◯]/.test(t);
+    const parts=[];
+    if(hasBlock) parts.push('massa sólida');
+    if(hasLines) parts.push('linhas horizontais');
+    if(hasGrid)  parts.push('grade geométrica');
+    if(hasTri)   parts.push('triângulos');
+    if(hasCirc)  parts.push('círculos');
+    return 'Arte ASCII' + (parts.length? (' — '+parts.join(', ')) : '');
+  }
+  function sanitizeForTTS(txt, type){
+    let s = txt || '';
+    // nunca dizer “barra”, “ponto”, etc. trocamos por pausas sutis
+    s = s.replace(/[\\/|*_=`~^<>#$begin:math:display$$end:math:display${}()+\-]+/g, ' ');
+    s = s.replace(/:+/g, ', ').replace(/\.+/g, ', ');
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    if(type==='code') return 'Bloco de código com ' + (txt.split(/\n/).length) + ' linhas.';
+    if(type==='ascii' && PREFS.asciiMode==='describe') return describeAscii(txt);
+    if(type==='ascii' && PREFS.asciiMode==='skip') return '';
+    return s;
+  }
+  function sectionIndexOf(node){
+    const sections = [...document.querySelectorAll('#root details.acc')];
+    const i = sections.findIndex(d => d.contains(node));
+    return i < 0 ? 0 : i;
+  }
+
+  /* ---------- Build dos blocos ---------- */
+  function rebuild(){
+    const root = getRoot();
+    const nodes = [...root.querySelectorAll(BLOCK_SEL)];
+    const out=[];
+    for(const node of nodes){
+      let text = (node.innerText||'').replace(/\bCopiar\b/g,'').trim();
+      if(!text) continue;
+      const type = node.matches('pre') ? 'code'
+                : node.matches('.equation') ? 'equation'
+                : isAsciiArt(text) ? 'ascii'
+                : node.matches('blockquote,.callout') ? 'quote'
+                : node.matches('li') ? 'list'
+                : node.matches('td,th') ? 'cell'
+                : node.matches('h1,h2,h3,h4,h5,h6') ? 'heading'
+                : 'para';
+      out.push({ node, raw:text, type, sectionIdx: sectionIndexOf(node) });
+    }
+    blocks = out; idx = 0;
+    setStatus(blocks.length ? `TTS pronto: ${blocks.length} blocos.` : 'Nenhum bloco.');
+    toast(`TTS pronto (${blocks.length})`);
+  }
+
+  /* ---------- Outline / Grade ---------- */
+  function showOutlineFor(node){
+    if(!PREFS.outline || !node) return hideOutline();
+    const r = node.getBoundingClientRect();
+    outline.style.display = 'block';
+    outline.style.left = (window.scrollX + r.left - 6) + 'px';
+    outline.style.top  = (window.scrollY + r.top  - 6) + 'px';
+    outline.style.width  = (r.width + 12) + 'px';
+    outline.style.height = (r.height + 12) + 'px';
+  }
+  function hideOutline(){ outline.style.display='none'; }
+  function highlight(){
+    document.querySelectorAll('[data-tts-current]').forEach(el=>el.removeAttribute('data-tts-current'));
+    const b = blocks[idx]; if(!b) return;
+    b.node.setAttribute('data-tts-current','true');
+    try{ b.node.scrollIntoView({behavior:'smooth', block:'center'});}catch(e){}
+    showOutlineFor(b.node);
+  }
+  window.addEventListener('scroll', ()=>{ if(PREFS.outline && outline.style.display==='block'){ const b=blocks[idx]; b && showOutlineFor(b.node); } }, {passive:true});
+  window.addEventListener('resize', ()=>{ const b=blocks[idx]; b && showOutlineFor(b.node); });
+
+  /* ---------- Falar (com gatilhos arquetípicos) ---------- */
+  function voiceStyleFor(text){
+    for(const k in ARCH_STYLES){
+      const st = ARCH_STYLES[k];
+      if(st.find.test(text)) return st;
+    }
+    return { rate:1.0, pitch:1.0 };
+  }
+  function pickVoiceFor(text){
+    const st = voiceStyleFor(text);
+    // tenta achar outra voz pt-BR para alternar quando gatilho detectado
+    const pt = VOICES.filter(v=>/pt/i.test(v.lang));
+    const alt = pt.find(v=>/Luciana|Camila|Fabiana|Maria|Helena|Daniel|Felipe|Rafael|Thiago|Jo[aã]o/i.test(v.name||'')) || pt[0] || baseVoice;
+    return { voice: alt||baseVoice, rate: st.rate, pitch: st.pitch };
+  }
+
+  function speakCurrent(){
+    if(!blocks.length) rebuild();
+    if(idx<0) idx=0;
+    if(idx>=blocks.length){ stop(); toast('Fim.'); return; }
+
+    const b = blocks[idx];
+    let text = sanitizeForTTS(b.raw, b.type);
+    if(!text){ idx++; return speakCurrent(); }
+
+    try{ synth.cancel(); }catch(e){}
+    const conf = pickVoiceFor(text);
+    u = new SpeechSynthesisUtterance(text);
+    if(conf.voice) u.voice = conf.voice;
+    u.lang = (conf.voice && conf.voice.lang) || 'pt-BR';
+    u.rate = conf.rate; u.pitch = conf.pitch; u.volume = 1.0;
+
+    u.onend   = ()=>{ if(!speaking) return; idx++; speakCurrent(); };
+    u.onerror = ()=>{ if(!speaking) return; idx++; speakCurrent(); };
+
+    highlight();
+    setStatus(`Lendo ${idx+1}/${blocks.length}…`);
+    synth.speak(u);
+  }
+
+  function play(){ speaking=true; setPressed($('#tts-on',dock), true); if(!blocks.length) rebuild(); speakCurrent(); }
+  function stop(){ speaking=false; try{ synth.cancel(); }catch(e){} setPressed($('#tts-on',dock), false); setStatus('Pausado.'); hideOutline(); }
+  function toggle(){ speaking ? stop() : play(); }
+
+  /* ---------- Navegação e Reset ---------- */
+  function next(){ speaking=true; setPressed($('#tts-on',dock), true); idx++; speakCurrent(); }
+  function prev(){ speaking=true; setPressed($('#tts-on',dock), true); idx=Math.max(0, idx-1); speakCurrent(); }
+  function reset(opts={}){
+    // “resetar a memória”: cancela, limpa índice e (se pedido) pula para a próxima seção
+    stop();
+    if(!blocks.length) rebuild();
+    if(opts.nextSection === true){
+      const cur = blocks[idx]?.sectionIdx ?? 0;
+      const nextSec = blocks.findIndex(b => b.sectionIdx > cur);
+      idx = nextSec >= 0 ? nextSec : 0;
+    }else if(typeof opts.sectionIndex === 'number'){
+      const jump = blocks.findIndex(b => b.sectionIdx === opts.sectionIndex);
+      idx = jump >= 0 ? jump : 0;
+    }else{
+      idx = 0;
+    }
+    setStatus('Resetado. Pronto para ler.');
+    if(PREFS.outline && blocks[idx]) showOutlineFor(blocks[idx].node);
+  }
+
+  /* ---------- Click-to-read + grade no clique ---------- */
+  document.addEventListener('click', (ev)=>{
+    const block = ev.target.closest(BLOCK_SEL);
+    if(block){
+      if(PREFS.outline) showOutlineFor(block);
+      const i = blocks.findIndex(b => b.node === block);
+      if(i >= 0){
+        idx = i;
+        if(speaking){ speakCurrent(); }
+      }
+    }
+  }, {passive:false});
+
+  /* ---------- Botões ---------- */
+  $('#tts-on',dock)?.addEventListener('click', (e)=>{ e.preventDefault(); toggle(); });
+  $('#tts-prev',dock)?.addEventListener('click', (e)=>{ e.preventDefault(); prev(); });
+  $('#tts-next',dock)?.addEventListener('click', (e)=>{ e.preventDefault(); next(); });
+  $('#tts-sel',dock)?.addEventListener('click', (e)=>{ e.preventDefault();
+    const t = String(window.getSelection && window.getSelection()).trim();
+    if(!t){ toast('Selecione um trecho primeiro'); return; }
+    try{ synth.cancel(); }catch(e){}
+    const conf = pickVoiceFor(t);
+    const uu = new SpeechSynthesisUtterance(sanitizeForTTS(t,'para'));
+    if(conf.voice) uu.voice = conf.voice;
+    uu.lang = (conf.voice && conf.voice.lang) || 'pt-BR';
+    uu.rate = conf.rate; uu.pitch = conf.pitch; uu.volume = 1.0;
+    synth.speak(uu);
+  });
+  $('#tts-stop',dock)?.addEventListener('click', (e)=>{ e.preventDefault(); stop(); });
+  $('#tts-reset',dock)?.addEventListener('click', (e)=>{ e.preventDefault(); reset({nextSection:true}); });
+  $('#tts-grid',dock)?.addEventListener('click', (e)=>{ e.preventDefault();
+    PREFS.outline = !PREFS.outline; savePrefs();
+    if(!PREFS.outline) hideOutline(); else { const b=blocks[idx]; b && showOutlineFor(b.node); }
+    setPressed($('#tts-grid',dock), PREFS.outline);
+  });
+  setPressed($('#tts-grid',dock), PREFS.outline);
+
+  /* ---------- Auto-wire com os botões já existentes do FAB ---------- */
+  window.ACTIONS = window.ACTIONS || {};
+  window.ACTIONS.tts      = ()=> toggle();
+  window.ACTIONS.ttsPrev  = ()=> prev();
+  window.ACTIONS.ttsNext  = ()=> next();
+  window.ACTIONS.ttsStop  = ()=> stop();
+  window.ACTIONS.ttsReset = ()=> reset({nextSection:true});
+
+  /* ---------- Hook no Auto-Gerar: ao gerar, recalcula blocos ---------- */
+  const wrapAuto = (name)=>{
+    if(typeof window[name] === 'function'){
+      const orig = window[name];
+      window[name] = function(txt){
+        const out = orig.apply(this, arguments);
+        setTimeout(()=> rebuild(), 30);  // dá tempo do DOM renderizar
+        return out;
+      }
+    }
+  };
+  wrapAuto('autoBuild');
+  wrapAuto('autoBuildNested');
+
+  /* ---------- Expor API ---------- */
+  window.KOBLLUX_TTS = {
+    rebuild, play, stop, next, prev,
+    reset, info: ()=>({ total:blocks.length, idx, speaking, prefs:PREFS })
+  };
+
+  /* ---------- Init ---------- */
+  try{ if(window.__tts && typeof window.__tts.stop === 'function') window.__tts.stop(); }catch(e){}
+  rebuild(); setStatus('Pronto.');
+  setPressed($('#tts-on',dock), false);
+
+  /* ---------- Utils (prefs/pos) ---------- */
+  function readPrefs(){ try{ return JSON.parse(localStorage.getItem(PREF_KEY)||'{}'); }catch{ return {}; } }
+  function savePrefs(){ try{ localStorage.setItem(PREF_KEY, JSON.stringify(PREFS)); }catch(e){} }
+  function applySavedPos(){
+    try{ const s=JSON.parse(localStorage.getItem(POS_KEY)||'null'); if(s){ setCSS('--tts-left', s.left); setCSS('--tts-bottom', s.bottom); } }catch(e){}
+  }
+  function savePos(){
+    try{
+      const cs=getComputedStyle(document.documentElement);
+      localStorage.setItem(POS_KEY, JSON.stringify({
+        left: cs.getPropertyValue('--tts-left').trim(),
+        bottom: cs.getPropertyValue('--tts-bottom').trim()
+      }));
+    }catch(e){}
+  }
+})();
+</script>
+<!-- /PATCH ÚNICO — TTS v3 -->
 
 </body></html>
