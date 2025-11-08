@@ -6,8 +6,8 @@
 <title>Portal — Livro Vivo</title>
 <meta name="theme-color" content="#0a0e18" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="icons/icon-192.PNG" />
-<link rel="apple-touch-icon" href="icons/icon-192.PNG" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <meta name="color-scheme" content="dark"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
@@ -682,7 +682,7 @@ function inlineMD(s){
     ensureVoice();
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    if(__tts_voice) u.voice = __tts_voice;
+    if(__tts_voice) // [auto-clean] removed hard-coded u.voice;
     u.lang = (__tts_voice && __tts_voice.lang) || 'pt-BR';
     u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
     speechSynthesis.speak(u);
@@ -3262,7 +3262,7 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
     if(!t){ toastSafe('Selecione um trecho primeiro'); return; }
     ensureVoice(); try{ synth.cancel(); }catch(e){}
     const u = new SpeechSynthesisUtterance(t);
-    if(voice) u.voice = voice;
+    if(voice) // [auto-clean] removed hard-coded u.voice;
     u.lang = (voice && voice.lang) || 'pt-BR';
     u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
     synth.speak(u);
@@ -3577,8 +3577,9 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
   }
   function sanitize(txt,type){
     let s = stripKaTeX(txt||'');
-    // s = s.replace(/[\\/|*_=`~^<>#{}$begin:math:display$$end:math:display$()+\-]+/g, ' ');
-    // s = s.replace(/:+/g, ', ').replace(/\.+/g, ', ');
+s = s.replace(/[\\/*_|=`~^<>#${}()+\-]+/g, ' ');
+s = s.replace(/\$begin:math:display\$\$[\s\S]*?\$\$end:math:display\$/g, ' ');
+    s = s.replace(/:+/g, ', ').replace(/\.+/g, ', ');
     s = s.replace(/\s{2,}/g,' ').trim();
     if(type==='code')     return 'Bloco de código com ' + (txt.split(/\n/).length) + ' linhas.';
     if(type==='equation') return 'Equação matemática.';
@@ -3662,7 +3663,7 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
     try{ synth.cancel(); }catch{}
     const conf = pickVoiceFor(text);
     const u = new SpeechSynthesisUtterance(text);
-    if(conf.voice) u.voice = conf.voice;
+    if(conf.voice) // [auto-clean] removed hard-coded u.voice;
     u.lang = (conf.voice && conf.voice.lang) || 'pt-BR';
     u.rate = conf.rate; u.pitch = conf.pitch; u.volume=1;
 
@@ -3726,7 +3727,7 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
     try{ synth.cancel(); }catch{}
     const conf = pickVoiceFor(t);
     const uu = new SpeechSynthesisUtterance(sanitize(t,'para'));
-    if(conf.voice) uu.voice=conf.voice;
+    if(conf.voice) u// [auto-clean] removed hard-coded u.voice;
     uu.lang=(conf.voice&&conf.voice.lang)||'pt-BR'; uu.rate=conf.rate; uu.pitch=conf.pitch; uu.volume=1;
     synth.speak(uu);
   });
@@ -3800,6 +3801,32 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
 })();
 </script>
 
+<script>
+/* PATCH: substitui a função pickVoiceFor original pela versão com HOOK */
+function pickVoiceFor(text){
+  // se existir um hook externo (IA), tenta classificar primeiro
+  try{
+    if (window.KOB_TTS_VOICE_STYLE_HOOK) {
+      const arch = window.KOB_TTS_VOICE_STYLE_HOOK(text);
+      if (arch) {
+        const ST = {
+          atlas:{rate:.95,pitch:1.00}, nova:{rate:1.12,pitch:1.12},
+          vitalis:{rate:1.08,pitch:1.05}, pulse:{rate:1.04,pitch:1.08},
+          serena:{rate:.98,pitch:.96}, kaos:{rate:1.18,pitch:1.02},
+          genus:{rate:1.00,pitch:1.00}, lumine:{rate:1.06,pitch:1.10},
+          rhea:{rate:.97,pitch:1.00}, solus:{rate:.93,pitch:.95},
+          aion:{rate:1.00,pitch:1.08}
+        }[String(arch).toLowerCase()];
+        if (ST) return { voice: baseVoice, rate: ST.rate, pitch: ST.pitch };
+      }
+    }
+  }catch(e){}
+  // fallback regex (v32)
+  const st = voiceStyleFor(text);
+  return { voice: baseVoice, rate: st.rate, pitch: st.pitch };
+}
+</script>
+
 <!-- KOBLLUX :: TTS v32.2 — Patch Correto (clique + dock + limpeza de texto) -->
 <script id="KOB_TTS_V32_2">
 (()=>{
@@ -3837,11 +3864,11 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
     return cand || voices[0] || null;
   }
 
-  // function ensureVoice(){
-   // if(!__tts_voice){
-   //   __tts_voice = pickPTBRVoice();
- //   }
-//  } 
+  function ensureVoice(){
+    if(!__tts_voice){
+      __tts_voice = pickPTBRVoice();
+    }
+  }
 
   /* ========= LIMPEZA DO TEXTO ========= */
   function cleanText(raw){
@@ -3889,7 +3916,7 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
     const u = new SpeechSynthesisUtterance(cleaned);
     __tts_utterance = u;
 
-    if(__tts_voice) u.voice = __tts_voice;
+    if(__tts_voice) // [auto-clean] removed hard-coded u.voice;
     u.lang = (__tts_voice && __tts_voice.lang) || 'pt-BR';
     u.rate = 1.0;
     u.pitch = 1.0;
@@ -4060,4 +4087,815 @@ window.addEventListener('DOMContentLoaded', autoMountBugadao);
 })();
 </script>
 
+
+<!-- KOBLLUX · Archetype→Voice Override (No-Gender, Auto per Archetype) : V1 -->
+<script id="KOB_TTS_ARQVOICE_V1">(function(){
+  if(!('speechSynthesis' in window)) return;
+  if(window.__KOB_TTS_ARQVOICE_V1__) return; window.__KOB_TTS_ARQVOICE_V1__=true;
+
+  const ARCH_MAP = {"Atlas": ["Daniel", "Ricardo", "Miguel", "pt-BR", "pt-PT", "pt", "en-US"], "Nova": ["Luciana", "Joana", "Vitoria", "Vitória", "pt-BR", "pt-PT", "pt", "en-US"], "Vitalis": ["Reed", "Daniel", "Ricardo", "pt-BR", "en-US", "en"], "Pulse": ["Grandma", "Luciana", "Joana", "en-US", "pt-BR"], "Artemis": ["Junior", "Joao", "João", "Daniel", "pt-BR", "pt-PT"], "Serena": ["Joana", "Luciana", "Francisca", "pt-PT", "pt-BR", "pt"], "Kaos": ["Rocko", "Ricardo", "Daniel", "en-US", "pt-BR"], "Genus": ["Eddy", "Daniel", "Ricardo", "en-US", "pt-BR"], "Lumine": ["Flo", "Luciana", "Joana", "en-US", "pt-BR"], "Solus": ["Fred", "Daniel", "Ricardo", "en-US", "pt-BR"], "Rhea": ["Moira", "Joana", "Luciana", "pt-PT", "pt-BR"], "Aion": ["Rishi", "Daniel", "Ricardo", "en-IN", "en-US", "pt-BR"], "Muda": ["Daniel", "Ricardo", "Luciana", "pt-BR", "pt-PT", "pt", "en-US"]};
+
+  function norm(s){ return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase(); }
+  function getVoices(){ try{ return speechSynthesis.getVoices()||[]; }catch(e){ return []; } }
+
+  const prev = speechSynthesis.onvoiceschanged;
+  speechSynthesis.onvoiceschanged = function(){
+    try{ prev && prev.apply(speechSynthesis, arguments); }catch(e){}
+  };
+
+  function pickVoiceByAliases(aliases, voices){
+    if(!voices || !voices.length) voices = getVoices();
+    for(const a of (aliases||[])){
+      const na = norm(a);
+      const v1 = voices.find(v => norm(v.name).includes(na));
+      if(v1) return v1;
+    }
+    for(const a of (aliases||[])){
+      const na = norm(a);
+      const v2 = voices.find(v => norm(v.lang||'').includes(na));
+      if(v2) return v2;
+    }
+    const vpt = voices.find(v => /^pt(-|$)/i.test(v.lang||''));
+    if(vpt) return vpt;
+    return voices[0] || null;
+  }
+
+  function getPreset(){
+    try{ return JSON.parse(localStorage.getItem('INFODOSE_TUNER_V1')||'{}'); }catch(e){ return {}; }
+  }
+
+  const RE_ARQ_PREFIX = new RegExp(String.raw`^(?:\\s*)(Atlas|Nova|Vitalis|Pulse|Artemis|Serena|Kaos|Genus|Lumine|Solus|Rhea|Aion|Muda)\\s*[:—-]\\s*`, 'i');
+  const RE_ARQ_TAG = /\[arq\s*:\s*(Atlas|Nova|Vitalis|Pulse|Artemis|Serena|Kaos|Genus|Lumine|Solus|Rhea|Aion|Muda)\s*\]/i;
+
+  function resolveArchetypeFromText(txt){
+    if(!txt) return null;
+    const m1 = txt.match(RE_ARQ_PREFIX); if(m1) return m1[1];
+    const m2 = txt.match(RE_ARQ_TAG);    if(m2) return m2[1];
+    return null;
+  }
+
+  function applyPresetAndArchetype(u){
+    try{
+      const voices = getVoices();
+      const preset = getPreset();
+      const txt = (u && (u.text||u._text||'')) || '';
+      const arch = resolveArchetypeFromText(txt);
+
+      if(arch && preset && preset.archetypes && preset.archetypes[arch]){
+        const cfg = preset.archetypes[arch];
+        if(Number.isFinite(cfg.rate))  u.rate  = cfg.rate;
+        if(Number.isFinite(cfg.pitch)) u.pitch = cfg.pitch;
+        if(cfg.voice){
+          const aliases = [cfg.voice, ...(ARCH_MAP[arch]||[])];
+          const v = pickVoiceByAliases(aliases, voices);
+          if(v){ u.voice = v; u.lang = v.lang || u.lang || 'pt-BR'; return; }
+        }
+      }
+
+      if(arch && ARCH_MAP[arch]){
+        const v = pickVoiceByAliases(ARCH_MAP[arch], voices);
+        if(v){ u.voice = v; u.lang = v.lang || u.lang || 'pt-BR'; }
+      } else {
+        if(!u.voice){
+          const vpt = voices.find(v => /^pt(-|$)/i.test(v.lang||''));
+          if(vpt){ u.voice = vpt; u.lang = vpt.lang || 'pt-BR'; }
+        }
+      }
+    }catch(e){}
+  }
+
+  const NATIVE_SPEAK = speechSynthesis.speak.bind(speechSynthesis);
+  speechSynthesis.speak = function(utt){
+    try{ applyPresetAndArchetype(utt); }catch(e){}
+    NATIVE_SPEAK(utt);
+  };
+
+  console.log('[KOBLLUX] Archetype→Voice Override (V1) ativo — sem gênero manual; voz por arquétipo.');
+})();</script>
+
+<!-- KOBLLUX · Debug Console Overlay (V2) -->
+<style id="KOBDBG_CSS">
+#kobdbg-toggle{position:fixed;bottom:16px;left:16px;z-index:2147483647}
+#kobdbg-toggle button{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;font:600 14px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;border-radius:999px;border:0;box-shadow:0 2px 6px rgba(0,0,0,.15);background:#0f0;color:#000}
+#kobdbg{position:fixed;inset:0 0 auto 0;top:56px;left:8px;width:calc(100vw - 16px);max-width:920px;height:min(78vh,700px);z-index:2147483646;display:none}
+#kobdbg .panel{background:#0b0b0e; color:#e7fbe7; border:1px solid #1b1f1b; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.5); height:100%; display:flex; flex-direction:column; overflow:hidden}
+#kobdbg header{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid #1c221c;background:linear-gradient(90deg,#0f0 0,#0f0a 60%,#0f0 100%);color:#000}
+#kobdbg header .title{font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+#kobdbg header .spacer{flex:1}
+#kobdbg header .btn{font:600 11px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;padding:6px 8px;border-radius:8px;border:0;background:#111;color:#0f0;border:1px solid #182;cursor:pointer}
+#kobdbg nav{display:flex;gap:6px;padding:6px;background:#0f140f;border-bottom:1px solid #1c221c;flex-wrap:wrap}
+#kobdbg nav button{font:600 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;padding:8px;border-radius:8px;border:1px solid #1d281d;background:#0d120d;color:#9fef9f;cursor:pointer}
+#kobdbg nav button.active{background:#122c12;color:#d6ffd6;border-color:#2c4}
+#kobdbg .view{flex:1;overflow:auto;padding:8px;display:none}
+#kobdbg .view.active{display:block}
+#kobdbg pre, #kobdbg textarea{width:100%;min-height:140px;background:#0a0a0c;color:#d6ffd6;border:1px solid #1d281d;border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap}
+#kobdbg table{width:100%;border-collapse:collapse;font:12px/1.35 ui-monospace,Menlo,Consolas,monospace}
+#kobdbg th,#kobdbg td{border-bottom:1px dashed #1d281d;padding:6px 8px;text-align:left;vertical-align:top}
+#kobdbg .row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
+#kobdbg .row .btn{font:600 12px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;padding:8px;border-radius:8px;border:1px solid #1d281d;background:#0e120e;color:#aefcae;cursor:pointer}
+#kobdbg small.hint{opacity:.7}
+/* Picker highlight */
+#kobdbg-pick-overlay{position:fixed;pointer-events:none;border:2px dashed #0f0;background:rgba(0,255,0,.08);z-index:2147483645;display:none}
+#kobdbg-pick-label{position:fixed;pointer-events:none;background:#0f0;color:#000;padding:2px 6px;font:600 11px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;border-radius:6px;z-index:2147483645;display:none}
+@media (max-width:480px){ #kobdbg{top:56px; height:70vh} }
+</style>
+<div id="kobdbg-toggle" class="kob-drift" data-key="debug_toggle" data-edge="1" data-idle="3000" data-dim="15000" data-ghost="60000" data-opacity-idle=".6" data-opacity-dim=".3" data-opacity-ghost=".1"><button type="button" aria-label="Abrir console">◎</button></div>
+<div id="kobdbg">
+  <div class="panel">
+    <header>
+      <div class="title">KOBLLUX · Console</div>
+      <div class="spacer"></div>
+      <button class="btn" data-kobdbg="export-html">Export HTML</button>
+      <button class="btn" data-kobdbg="close">Fechar</button>
+    </header>
+    <nav>
+      <button data-kobdbg-tab="logs" class="active">Logs</button>
+      <button data-kobdbg-tab="preset">Preset</button>
+      <button data-kobdbg-tab="inject">Injetar</button>
+      <button data-kobdbg-tab="voices">Vozes</button>
+      <button data-kobdbg-tab="dom">DOM</button>
+      <button data-kobdbg-tab="pick">Pick</button>
+    </nav>
+    <section class="view active" data-kobdbg-view="logs">
+      <div class="row">
+        <button class="btn" data-kobdbg="copy-logs">Copiar</button>
+        <button class="btn" data-kobdbg="save-logs">Salvar .json</button>
+        <button class="btn" data-kobdbg="clear-logs">Limpar</button>
+        <small class="hint">Capta console.log/info/warn/error + eventos TTS</small>
+      </div>
+      <pre id="kobdbg-logs"></pre>
+    </section>
+    <section class="view" data-kobdbg-view="preset">
+      <div class="row">
+        <button class="btn" data-kobdbg="load-preset">Ler</button>
+        <button class="btn" data-kobdbg="save-preset">Salvar</button>
+        <button class="btn" data-kobdbg="export-preset">Export .json</button>
+        <button class="btn" data-kobdbg="reset-preset">Reset</button>
+      </div>
+      <textarea id="kobdbg-preset" placeholder='Preset INFODOSE_TUNER_V1 (JSON)'></textarea>
+    </section>
+    <section class="view" data-kobdbg-view="inject">
+      <div class="row">
+        <button class="btn" data-kobdbg="insert-style">Inserir CSS</button>
+        <button class="btn" data-kobdbg="insert-js-text">Inserir JS (texto)</button>
+      </div>
+      <textarea id="kobdbg-css" placeholder='/* cola teu CSS aqui */'></textarea>
+      <textarea id="kobdbg-js" placeholder='// cola teu JavaScript aqui (será inserido como texto &lt;script type="text/plain"&gt;)' ></textarea>
+    </section>
+    <section class="view" data-kobdbg-view="voices">
+      <div class="row">
+        <button class="btn" data-kobdbg="scan-voices">Scan</button>
+        <button class="btn" data-kobdbg="speak-test">Speak Test</button>
+      </div>
+      <table id="kobdbg-voices"></table>
+    </section>
+    <section class="view" data-kobdbg-view="dom">
+      <div class="row">
+        <button class="btn" data-kobdbg="dom-refresh">Refresh</button>
+        <button class="btn" data-kobdbg="dom-copy-outer">Copiar outerHTML</button>
+        <button class="btn" data-kobdbg="dom-apply-inner">Aplicar innerHTML</button>
+        <button class="btn" data-kobdbg="dom-remove-node">Remover nó</button>
+        <small class="hint">Mostra e edita o elemento selecionado (via Pick ou manual).</small>
+      </div>
+      <div class="row">
+        <input id="kobdbg-dom-selector" placeholder="CSS selector (ex.: #app .card:nth-child(2))" style="flex:1;min-width:240px;font:12px ui-monospace,Menlo,Consolas,monospace;padding:8px;border-radius:8px;border:1px solid #1d281d;background:#0e120e;color:#aefcae;">
+        <button class="btn" data-kobdbg="dom-select">Selecionar</button>
+      </div>
+      <pre id="kobdbg-dom-info"></pre>
+      <textarea id="kobdbg-dom-editor" placeholder="innerHTML do elemento selecionado"></textarea>
+    </section>
+    <section class="view" data-kobdbg-view="pick">
+      <div class="row">
+        <button class="btn" data-kobdbg="pick-start">Iniciar Pick</button>
+        <button class="btn" data-kobdbg="pick-stop">Parar</button>
+        <small class="hint">Toque/clique em qualquer elemento da página para selecioná-lo.</small>
+      </div>
+      <pre id="kobdbg-pick-target"></pre>
+    </section>
+  </div>
+</div>
+<div id="kobdbg-pick-overlay"></div>
+<div id="kobdbg-pick-label"></div>
+<script id="KOBDBG_JS">(function(){
+  let currentEl = null;
+  const $ = (sel,root=document)=>root.querySelector(sel);
+  const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
+
+  const elToggleBtn = document.querySelector('#kobdbg-toggle button');
+  const elWrap = document.getElementById('kobdbg');
+  const elLogs = document.getElementById('kobdbg-logs');
+  const elPreset = document.getElementById('kobdbg-preset');
+  const elCSS = document.getElementById('kobdbg-css');
+  const elJS = document.getElementById('kobdbg-js');
+  const elVoicesTbl = document.getElementById('kobdbg-voices');
+  const elDomInfo = document.getElementById('kobdbg-dom-info');
+  const elDomEditor = document.getElementById('kobdbg-dom-editor');
+  const elDomSelector = document.getElementById('kobdbg-dom-selector');
+  const elPickOverlay = document.getElementById('kobdbg-pick-overlay');
+  const elPickLabel = document.getElementById('kobdbg-pick-label');
+  const elPickTarget = document.getElementById('kobdbg-pick-target');
+
+  const logs = [];
+  function fmt(ts, level, msg){ return '['+new Date(ts).toLocaleTimeString()+'] '+level.toUpperCase()+': '+msg; }
+  function push(level, args){
+    try{
+      const msg = Array.from(args).map(x=>{
+        try{ return typeof x==='string'? x : JSON.stringify(x); }catch(e){ return String(x); }
+      }).join(' ');
+      const line = fmt(Date.now(), level, msg);
+      logs.push(line);
+      elLogs.textContent = logs.slice(-500).join('\\n');
+    }catch(e){}
+  }
+
+  // Monkey-patch console
+  ['log','info','warn','error'].forEach(level=>{
+    const native = console[level].bind(console);
+    console[level] = function(){ push(level, arguments); try{ native.apply(console, arguments);}catch(e){} };
+  });
+
+  // TTS event tap
+  try{
+    if('speechSynthesis' in window){
+      const nativeSpeak = speechSynthesis.speak.bind(speechSynthesis);
+      speechSynthesis.speak = function(u){
+        try{
+          const vname = u && u.voice ? u.voice.name : '(voz-desconhecida)';
+          push('log', ['[TTS]', (u.text||'').slice(0,80)+'…', '→', vname, '@ r', u.rate, ' p', u.pitch]);
+        }catch(e){}
+        nativeSpeak(u);
+      };
+    }
+  }catch(e){}
+
+  // Toggle + tabs
+  elToggleBtn.addEventListener('click', ()=>{ elWrap.style.display = (elWrap.style.display==='none'||!elWrap.style.display) ? 'block':'none'; });
+  elWrap.querySelector('[data-kobdbg="close"]').addEventListener('click', ()=>{ elWrap.style.display='none'; });
+  elWrap.querySelectorAll('nav button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      elWrap.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.getAttribute('data-kobdbg-tab');
+      elWrap.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      elWrap.querySelector('.view[data-kobdbg-view="'+tab+'"]').classList.add('active');
+    });
+  });
+
+  // Utils
+  function download(name, text){
+    const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }
+  function computePath(el){
+    if(!el) return '';
+    const parts = [];
+    while(el && el.nodeType === 1 && el !== document.body){
+      let sel = el.nodeName.toLowerCase();
+      if(el.id){ sel += '#'+el.id; parts.unshift(sel); break; }
+      let sib = el, i=1;
+      while((sib = sib.previousElementSibling)){ if(sib.nodeName===el.nodeName) i++; }
+      sel += ':nth-of-type('+i+')';
+      parts.unshift(sel);
+      el = el.parentElement;
+    }
+    return parts.join(' > ');
+  }
+  function describe(el){
+    if(!el) return '(nada selecionado)';
+    const rect = el.getBoundingClientRect();
+    const id = el.id ? '#'+el.id : '';
+    const cls = el.className ? '.'+String(el.className).trim().split(/\s+/).join('.') : '';
+    return `<${el.tagName.toLowerCase()}${id}${cls}>  ${Math.round(rect.width)}×${Math.round(rect.height)} @ (${Math.round(rect.left)},${Math.round(rect.top)})`;
+  }
+  function showDom(el){
+    currentEl = el || currentEl || document.body;
+    elDomInfo.textContent = (currentEl? (describe(currentEl)+'\n'+computePath(currentEl)) : '(nada)');
+    try{ elDomEditor.value = currentEl ? currentEl.innerHTML : ''; }catch(e){ elDomEditor.value=''; }
+  }
+
+  // Actions: Logs
+  elWrap.querySelector('[data-kobdbg="copy-logs"]').addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(logs.join('\\n')); alert('Logs copiados.'); }catch(e){ alert('Falha ao copiar'); }
+  });
+  elWrap.querySelector('[data-kobdbg="save-logs"]').addEventListener('click', ()=> download('kobllux_logs.json', JSON.stringify({logs}, null, 2)));
+  elWrap.querySelector('[data-kobdbg="clear-logs"]').addEventListener('click', ()=>{ logs.length=0; elLogs.textContent=''; });
+
+  // Preset
+  const PRESET_KEY = 'INFODOSE_TUNER_V1';
+  elWrap.querySelector('[data-kobdbg="load-preset"]').addEventListener('click', ()=>{ try{ elPreset.value = localStorage.getItem(PRESET_KEY) || ''; }catch(e){ elPreset.value=''; } });
+  elWrap.querySelector('[data-kobdbg="save-preset"]').addEventListener('click', ()=>{ try{ localStorage.setItem(PRESET_KEY, elPreset.value); alert('Preset salvo.'); }catch(e){ alert('Falha ao salvar'); } });
+  elWrap.querySelector('[data-kobdbg="export-preset"]').addEventListener('click', ()=>{ try{ const txt = localStorage.getItem(PRESET_KEY)||''; download('INFODOSE_TUNER_V1.json', txt||'{}'); }catch(e){} });
+  elWrap.querySelector('[data-kobdbg="reset-preset"]').addEventListener('click', ()=>{ try{ localStorage.removeItem(PRESET_KEY); elPreset.value=''; alert('Preset removido.'); }catch(e){} });
+
+  // Inject
+  elWrap.querySelector('[data-kobdbg="insert-style"]').addEventListener('click', ()=>{
+    const css = elCSS.value || '';
+    const el = document.getElementById('KOB_INJECTED_STYLE') || Object.assign(document.createElement('style'), {id:'KOB_INJECTED_STYLE'});
+    el.textContent = css;
+    document.head.appendChild(el);
+    alert('CSS aplicado.');
+  });
+  elWrap.querySelector('[data-kobdbg="insert-js-text"]').addEventListener('click', ()=>{
+    const js = elJS.value || '';
+    const el = document.getElementById('KOB_INJECTED_JS') || Object.assign(document.createElement('script'), {id:'KOB_INJECTED_JS', type:'text/plain'});
+    el.textContent = js;
+    document.body.appendChild(el);
+    alert('JS inserido como texto (não executa).');
+  });
+
+  // Export HTML
+  elWrap.querySelector('[data-kobdbg="export-html"]').addEventListener('click', ()=>{
+    try{ const html = '<!doctype html>\\n' + document.documentElement.outerHTML; download('page_kobllux_debug.html', html); }catch(e){ alert('Falha ao exportar.'); }
+  });
+
+  // Voices
+  function tableVoices(vs){
+    const rows = ['<tr><th>name</th><th>lang</th><th>default</th><th>local</th></tr>'].concat((vs||[]).map(v=>`<tr><td>${v.name}</td><td>${v.lang||''}</td><td>${v.default||''}</td><td>${v.localService||''}</td></tr>`));
+    elVoicesTbl.innerHTML = rows.join('');
+  }
+  elWrap.querySelector('[data-kobdbg="scan-voices"]').addEventListener('click', ()=>{ try{ tableVoices(speechSynthesis.getVoices()||[]); }catch(e){ tableVoices([]); } });
+  elWrap.querySelector('[data-kobdbg="speak-test"]').addEventListener('click', ()=>{ try{ const u=new SpeechSynthesisUtterance('Teste de voz do console KOBLLUX'); speechSynthesis.speak(u); }catch(e){} });
+
+  // DOM Inspector
+  elWrap.querySelector('[data-kobdbg="dom-refresh"]').addEventListener('click', ()=> showDom(currentEl || document.body));
+  elWrap.querySelector('[data-kobdbg="dom-copy-outer"]').addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(currentEl ? currentEl.outerHTML : ''); alert('outerHTML copiado.'); }catch(e){ alert('Falha ao copiar'); }
+  });
+  elWrap.querySelector('[data-kobdbg="dom-apply-inner"]').addEventListener('click', ()=>{
+    if(!currentEl) return;
+    currentEl.innerHTML = elDomEditor.value;
+    showDom(currentEl);
+  });
+  elWrap.querySelector('[data-kobdbg="dom-remove-node"]').addEventListener('click', ()=>{
+    if(!currentEl) return;
+    currentEl.remove(); currentEl=null; showDom(document.body);
+  });
+  elWrap.querySelector('[data-kobdbg="dom-select"]').addEventListener('click', ()=>{
+    try{ const el = document.querySelector(elDomSelector.value); if(el){ showDom(el); } else { alert('Nada encontrado'); } }catch(e){ alert('Seletor inválido'); }
+  });
+
+  // Picker (visual)
+  let picking=false, lastEl=null;
+  function updOverlay(el,e){
+    if(!el) return;
+    const r = el.getBoundingClientRect();
+    elPickOverlay.style.display='block';
+    elPickOverlay.style.left=(r.left-2)+'px'; elPickOverlay.style.top=(r.top-2)+'px';
+    elPickOverlay.style.width=(r.width+4)+'px'; elPickOverlay.style.height=(r.height+4)+'px';
+    elPickLabel.style.display='block';
+    elPickLabel.style.left=(Math.max(8, r.left+8))+'px'; elPickLabel.style.top=(Math.max(8, r.top+8))+'px';
+    elPickLabel.textContent = el.tagName.toLowerCase() + (el.id?('#'+el.id):'');
+  }
+  function clearOverlay(){ elPickOverlay.style.display='none'; elPickLabel.style.display='none'; }
+  function pointerTarget(ev){ return ev.touches && ev.touches[0] ? document.elementFromPoint(ev.touches[0].clientX, ev.touches[0].clientY) : ev.target; }
+
+  function onMove(e){ if(!picking) return; const t = document.elementFromPoint( (e.touches? e.touches[0].clientX: e.clientX), (e.touches? e.touches[0].clientY: e.clientY) ); if(t && t!==document.body && !$('#kobdbg').contains(t)){ lastEl=t; updOverlay(t,e);} }
+  function onClick(e){ if(!picking) return; const t = document.elementFromPoint( (e.touches? e.touches[0].clientX: e.clientX), (e.touches? e.touches[0].clientY: e.clientY) ); if(t && !$('#kobdbg').contains(t)){ e.preventDefault(); e.stopPropagation(); picking=false; clearOverlay(); currentEl=t; elPickTarget.textContent = (describe(t)+'\\n'+computePath(t)); showDom(t); } }
+
+  elWrap.querySelector('[data-kobdbg="pick-start"]').addEventListener('click', ()=>{
+    picking=true; clearOverlay();
+    document.addEventListener('mousemove', onMove, {passive:true});
+    document.addEventListener('touchmove', onMove, {passive:true});
+    document.addEventListener('mousedown', onClick, {capture:true});
+    document.addEventListener('touchstart', onClick, {capture:true, passive:false});
+  });
+  elWrap.querySelector('[data-kobdbg="pick-stop"]').addEventListener('click', ()=>{
+    picking=false; clearOverlay();
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mousedown', onClick, {capture:true});
+    document.removeEventListener('touchstart', onClick, {capture:true});
+  });
+
+  // Init
+  showDom(document.body);
+})();</script>
+
+
+<!-- KOB_TTS_ARQVOICE_V2 — Archetype Voice Resolver (pt-BR first, debounce, voices-ready) -->
+<script id="KOB_TTS_ARQVOICE_V2">
+(()=>{
+  if(window.__KOB_TTS_ARQVOICE_V2__) return; window.__KOB_TTS_ARQVOICE_V2__=true;
+
+  // ---- Utilities
+  const log = (...a)=>{ try{ console.info('[ARQVOICE V2]', ...a);}catch(e){} };
+  const once = (fn)=>{ let ran=false, val; return (...args)=>{ if(ran) return val; ran=true; val=fn(...args); return val; }; };
+
+  // ---- Load preset (optional)
+  const PRESET_KEY = 'INFODOSE_TUNER_V1';
+  function loadPreset(){
+    try{ return JSON.parse(localStorage.getItem(PRESET_KEY)||'{}'); }catch(e){ return {}; }
+  }
+  const preset = loadPreset();
+  const pArq = (preset.archetypes||{});
+
+  
+const VOICE_MAP = Object.assign(
+  {"Atlas": "Daniel", "Nova": "Luciana", "Vitalis": "Reed", "Pulse": "Grandma", "Artemis": "Junior", "Serena": "Joana", "Kaos": "Rocko", "Genus": "Eddy", "Lumine": "Flo", "Solus": "Fred", "Rhea": "Moira", "Aion": "Rishi"},
+  (preset.voiceMap||{}),
+  (window.ARQ_VOICE_MAP||{})
+);
+// ---- Default per archetype (no hard lock on names; pitch/rate only)
+  const DEF = {
+    Atlas:   { pitch:1.00, rate:0.95 },
+    Nova:    { pitch:1.10, rate:1.12 },
+    Vitalis: { pitch:0.98, rate:1.00 },
+    Pulse:   { pitch:1.05, rate:1.08 },
+    Artemis: { pitch:1.06, rate:1.02 },
+    Serena:  { pitch:0.96, rate:0.98 },
+    Kaos:    { pitch:1.15, rate:1.18 },
+    Genus:   { pitch:1.00, rate:1.00 },
+    Lumine:  { pitch:1.06, rate:1.06 },
+    Solus:   { pitch:0.92, rate:0.92 },
+    Rhea:    { pitch:0.98, rate:0.98 },
+    Aion:    { pitch:1.12, rate:1.04 },
+  };
+
+  // ---- Voices ready (handles iOS delay)
+  function voicesNow(){ try{ return (speechSynthesis.getVoices()||[]); }catch(e){ return []; } }
+  function waitForVoices(timeoutMs=2000){
+    return new Promise(resolve=>{
+      const t0 = performance.now();
+      const tick = ()=>{
+        const vs = voicesNow();
+        if(vs.length>0 || (performance.now()-t0) > timeoutMs){ resolve(vs); return; }
+        setTimeout(tick, 60);
+      };
+      try{ speechSynthesis.onvoiceschanged = ()=> resolve(voicesNow()); }catch(e){}
+      tick();
+    });
+  }
+
+  // ---- Voice select (pt-BR first, then 'pt-*', then navigator.language, then default)
+  function normalize(s){ return String(s||'').toLowerCase(); }
+  function scoreVoice(v, wantLangs){
+    const lang = normalize(v.lang);
+    // Prefer localService, then matches in order
+    let s = 0;
+    if(v.localService) s += 2;
+    // wantLangs is array of language priorities (strings)
+    wantLangs.forEach((wl, i)=>{ if(lang.startsWith(normalize(wl))) s += (10 - i); });
+    return s;
+  }
+  function pickVoice(archetype, vs){
+    
+  // Mapping priority: if archetype has a mapped name, try it first
+  const mapName = (VOICE_MAP[archetype]||'').trim();
+  if(mapName){
+    const n = normalize(mapName);
+    const byExact = vs.find(v=> normalize(v.name)===n );
+    const bySub   = byExact || vs.find(v=> normalize(v.name).includes(n) );
+    if(bySub){ bySub.__arq_map_forced = true; return bySub; }
+  }
+// 1) if preset has explicit voice name (non-empty), honor if exists
+    const pv = (pArq[archetype]||{}).voice;
+    if(pv && pv.trim()){
+      const byName = vs.find(v=> normalize(v.name) === normalize(pv) ) || vs.find(v=> normalize(v.name).includes(normalize(pv)));
+      if(byName){ return byName; }
+    }
+    // 2) otherwise choose by language priority
+    const nav = (navigator.language||'').toLowerCase();
+    const want = ['pt-br','pt', nav || 'pt-br', 'en-us', 'en']; // pt first
+    let best = null, bestScore=-1;
+    for(const v of vs){
+      const sc = scoreVoice(v, want);
+      if(sc>bestScore){ best=v; bestScore=sc; }
+    }
+    return best || vs[0] || null;
+  }
+
+  // ---- Debounce identical utterances in a short window to avoid duplicates
+  let lastText='', lastWhen=0;
+  function shouldSkip(text){
+    const now = performance.now();
+    if(text && text===lastText && (now - lastWhen) < 120){ return true; }
+    lastText = text; lastWhen = now; return false;
+  }
+
+  // ---- Main "speak with archetype" hook
+  // Expect the rest of your code to call window.ARQ_SPEAK(text, archetype, type?)
+  async function ARQ_SPEAK(text, archetype, type='normal'){
+    if(!text) return;
+    if(shouldSkip(text)) return;
+
+    // Wait voices
+    const vs = await waitForVoices(2200);
+    if(!('SpeechSynthesisUtterance' in window)){ return; }
+
+    // Select voice
+    const vSel = pickVoice(archetype||'', vs);
+    const cfg = Object.assign({}, DEF[archetype||'']||{}, pArq[archetype||'']||{});
+    const u = new SpeechSynthesisUtterance(text);
+    if(vSel){ u.voice = vSel; u.lang = vSel.lang || 'pt-BR'; 
+    if(vSel && vSel.__arq_map_forced){ u.__arq_forced = true; }
+}
+    if(cfg.rate)  u.rate  = cfg.rate;
+    if(cfg.pitch) u.pitch = cfg.pitch;
+
+    try{
+      log('speak', {arch: archetype, text:text.slice(0,64)+'…', voice: vSel?vSel.name:'(default)', lang: u.lang, r:u.rate, p:u.pitch});
+      speechSynthesis.speak(u);
+    }catch(e){ log('ERR speak', e); }
+  }
+
+  // ---- Global hook (optional)
+  window.ARQ_SPEAK = ARQ_SPEAK;
+
+  // ---- Patch a "generic speak" if your app uses one
+  // If you already have a function speakArch(text, arch), you can re-route:
+  if(!window.speakArch){
+    window.speakArch = (t,a)=> ARQ_SPEAK(t,a);
+  }
+
+  // ---- Safety: if any legacy code sets u.voice after ours, guard here by overriding speak to re-enforce
+  const nativeSpeak = speechSynthesis.speak.bind(speechSynthesis);
+  speechSynthesis.speak = function(u){
+    try{
+      if(!(u instanceof SpeechSynthesisUtterance)){ return nativeSpeak(u); }
+      
+      
+      // respect mapping if explicitly forced on utterance (skip non-pt null)
+      if(u.voice && u.__arq_forced){ /* keep mapped voice */ }
+      else if(u.voice && !/^pt/i.test(u.voice.lang||'')) u.voice = null;
+
+      // if still no voice, try mapping by inferred archetype (text or global)
+      if(!u.voice){
+        try{
+          let arch = (window.ARQ_CURRENT_ARCHETYPE || u.arch || '');
+          if(!arch){
+            const t = (u.text||'');
+            let m = t.match(/\barch\s*:\s*([a-z]+)/i);
+            if(m) arch = m[1];
+            if(!arch){
+              // try known names appearing at start
+              m = t.match(/^\s*(Atlas|Nova|Vitalis|Pulse|Artemis|Serena|Kaos|Genus|Lumine|Solus|Rhea|Aion)\b/i);
+              if(m) arch = m[1];
+            }
+          }
+          if(arch){
+            const vs = voicesNow();
+            const mapName = (VOICE_MAP && VOICE_MAP[arch]) ? VOICE_MAP[arch] : '';
+            if(mapName){
+              const n = normalize(mapName);
+              const byExact = vs.find(v=> normalize(v.name)===n );
+              const bySub   = byExact || vs.find(v=> normalize(v.name).includes(n) );
+              if(bySub){ u.voice = bySub; u.lang = bySub.lang||u.lang; u.__arq_forced = true; }
+            }
+          }
+        }catch(e){}
+      }
+
+      // voices not ready? requeue once
+      if(!u.voice){
+        const vs = voicesNow();
+        if((vs||[]).length===0 && !u.__arq_queued){
+          u.__arq_queued = true;
+          return setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){} }, 120);
+        }
+      }
+if(u.voice && !/^pt/i.test(u.voice.lang||'')) u.voice = null;
+// If no voice/lang, apply our pick quickly
+      if(!u.voice){
+        const vs = voicesNow();
+        const v = pickVoice('(auto)', vs);
+        if(v){ u.voice=v; u.lang=v.lang||u.lang; }
+      }
+    }catch(e){}
+    return nativeSpeak(u);
+  };
+
+  // ---- Warmup (call once to trigger voices load on iOS after first touch)
+  setTimeout(()=>{ try{ speechSynthesis.getVoices(); }catch(e){} }, 50);
+
+  log('ready.');
+})();
+</script>
+
+<style id="KOB_DRIFT_CSS">
+.kob-drift{position:fixed;inset:auto auto 16px 16px;z-index:2147483000;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:44px;min-height:44px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.25);
+  background:#0e120e;color:#aefcae;box-shadow:0 8px 20px rgba(0,0,0,.35);
+  font:600 13px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  transition:opacity .25s ease, transform .2s ease;
+}
+.kob-drift:active{transform:scale(.98)}
+.kob-drift.is-idle{opacity: var(--kob-opacity-idle,.6)}
+.kob-drift.is-dim{opacity: var(--kob-opacity-dim,.3)}
+.kob-drift.is-ghost{opacity: var(--kob-opacity-ghost,.1)}
+.kob-drift.is-hidden{opacity:0;pointer-events:auto} /* ainda clicável, se posicionado */
+.kob-drift[data-edge="1"]{ /* só estilo indicativo */ outline:0 }
+.kob-drift[data-anchor="br"]{right:16px;left:auto;bottom:16px;top:auto}
+.kob-drift[data-anchor="tr"]{right:16px;left:auto;top:16px;bottom:auto}
+.kob-drift[data-anchor="tl"]{left:16px;top:16px;right:auto;bottom:auto}
+.kob-drift-badge{position:absolute;top:-8px;right:-8px;background:#0f0;color:#000;font:700 10px/1 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Arial;border-radius:999px;padding:4px 6px;border:1px solid #182}
+</style>
+<style id="KOB_DRIFT_OVERRIDE_FOR_DEBUG">
+#kobdbg-toggle.kob-drift{padding:0}
+#kobdbg-toggle.kob-drift button{background:transparent; border:0; box-shadow:none; width:100%; height:100%;
+  color:inherit; font:inherit; border-radius:inherit; padding:0; margin:0;}
+</style>
+<script id="KOB_DRIFT_JS">
+(()=>{
+  if(window.__KOB_DRIFT_V1__) return; window.__KOB_DRIFT_V1__=true;
+
+  const SAFE = {top:16, left:16, right:16, bottom:16}; // px padding contra as bordas/safe-area
+  const DBKEY = "KOB_DRIFT_STATE_V1";
+  const UpperStory = { // wrapper do localStorage (apelido)
+    get(k,def){ try{ const x=JSON.parse(localStorage.getItem(k)||"null"); return x??def; }catch(e){ return def; } },
+    set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  };
+
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function vw(){ return Math.max(document.documentElement.clientWidth, window.innerWidth||0); }
+  function vh(){ return Math.max(document.documentElement.clientHeight, window.innerHeight||0); }
+
+  // Estado global persistido: { [key]: { xPct, yPct } }
+  const STATE = UpperStory.get(DBKEY, {});
+
+  // Observa DOM por novos botões
+  const DRIFT_SELECTOR = '.kob-drift,[data-drift]';
+  const seen = new WeakSet();
+
+  function percFromPx(x, y, el){
+    const W = vw(), H = vh();
+    // usa centro do elemento pra persistir melhor
+    const rect = el.getBoundingClientRect();
+    const cx = clamp(x + rect.width/2, SAFE.left, W - SAFE.right);
+    const cy = clamp(y + rect.height/2, SAFE.top, H - SAFE.bottom);
+    return { xPct: +(cx / W * 100).toFixed(4), yPct: +(cy / H * 100).toFixed(4) };
+  }
+
+  function pxFromPerc(stored, el){
+    const W = vw(), H = vh();
+    const rect = el.getBoundingClientRect();
+    let cx = clamp(stored.xPct/100 * W, SAFE.left, W - SAFE.right);
+    let cy = clamp(stored.yPct/100 * H, SAFE.top, H - SAFE.bottom);
+    return { x: cx - rect.width/2, y: cy - rect.height/2 };
+  }
+
+  function snapToEdge(x,y,el){
+    const W = vw(), H = vh();
+    const rect = el.getBoundingClientRect();
+    const cx = x + rect.width/2;
+    const cy = y + rect.height/2;
+    const dist = {
+      left: cx - SAFE.left,
+      right: (W - SAFE.right) - cx,
+      top: cy - SAFE.top,
+      bottom: (H - SAFE.bottom) - cy
+    };
+    const entries = Object.entries(dist).sort((a,b)=>a[1]-b[1]);
+    const nearest = entries[0][0];
+    if(nearest==='left') x = SAFE.left;
+    if(nearest==='right') x = W - SAFE.right - rect.width;
+    if(nearest==='top') y = SAFE.top;
+    if(nearest==='bottom') y = H - SAFE.bottom - rect.height;
+    return {x,y,anchor: nearest==='left'?'l': nearest==='right'?'r': (nearest==='top'?'t':'b')};
+  }
+
+  function applyIdleTimers(el){
+    // Configs via data-*
+    const idleMs  = +(el.getAttribute('data-idle')  || 3000);
+    const dimMs   = +(el.getAttribute('data-dim')   || 15000);
+    const ghostMs = +(el.getAttribute('data-ghost') || 60000);
+    const opIdle  = +(el.getAttribute('data-opacity-idle')  || .6);
+    const opDim   = +(el.getAttribute('data-opacity-dim')   || .3);
+    const opGhost = +(el.getAttribute('data-opacity-ghost') || .1);
+    el.style.setProperty('--kob-opacity-idle',  opIdle);
+    el.style.setProperty('--kob-opacity-dim',   opDim);
+    el.style.setProperty('--kob-opacity-ghost', opGhost);
+
+    let tIdle=null, tDim=null, tGhost=null;
+    function clearAll(){ [tIdle,tDim,tGhost].forEach(t=>t&&clearTimeout(t)); tIdle=tDim=tGhost=null; }
+    function setState(cls){
+      el.classList.remove('is-idle','is-dim','is-ghost','is-hidden');
+      if(cls) el.classList.add(cls);
+    }
+    function arm(){
+      clearAll(); setState(null); // ativo (opacidade 1)
+      tIdle  = setTimeout(()=> setState('is-idle'),  idleMs);
+      tDim   = setTimeout(()=> setState('is-dim'),   dimMs);
+      tGhost = setTimeout(()=> setState('is-ghost'), ghostMs);
+    }
+    // eventos que reativam
+    ['pointerdown','pointerup','pointermove','click','keydown'].forEach(evt=>{
+      el.addEventListener(evt, arm, {passive:true});
+    });
+    arm();
+
+    // Long-press (toggle ghost) e double-tap (revive)
+    let pressTimer=null, lastTap=0;
+    el.addEventListener('pointerdown', ()=>{
+      if(pressTimer) clearTimeout(pressTimer);
+      pressTimer = setTimeout(()=>{ // long-press ≈ 300ms
+        if(el.classList.contains('is-ghost')){ setState(null); arm(); }
+        else setState('is-ghost');
+      }, + (el.getAttribute('data-press') || 300));
+    }, {passive:true});
+    el.addEventListener('pointermove', ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } }, {passive:true});
+    el.addEventListener('pointerup', ()=>{
+      if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; }
+      const now = Date.now();
+      if(now - lastTap < +(el.getAttribute('data-dtap')||260)){
+        setState(null); arm();
+      }
+      lastTap = now;
+    }, {passive:true});
+  }
+
+  function makeDrift(el){
+    if(seen.has(el)) return; seen.add(el);
+
+    // Storage key
+    const key = el.getAttribute('data-key') || el.id || ('btn_'+Math.random().toString(36).slice(2,8));
+
+    // Coloca numa posição inicial segura, se não for posicionado
+    const rect = el.getBoundingClientRect();
+    if(rect.width===0 && rect.height===0){
+      // se invisível, deixa que CSS/autor defina depois
+    }else{
+      // aplica posição salva (percentual), se existir
+      const st = STATE[key];
+      if(st){
+        const pos = pxFromPerc(st, el);
+        el.style.left = pos.x+'px'; el.style.top = pos.y+'px';
+        el.style.right='auto'; el.style.bottom='auto';
+      }else{
+        // Âncora opcional
+        const anchor = el.getAttribute('data-anchor'); // tl,tr,br (default = bl)
+        if(anchor==='tr') el.setAttribute('data-anchor','tr');
+        else if(anchor==='tl') el.setAttribute('data-anchor','tl');
+        else if(anchor==='br') el.setAttribute('data-anchor','br');
+        else el.setAttribute('data-anchor','bl');
+      }
+    }
+
+    // Idle timers
+    applyIdleTimers(el);
+
+    // Drag
+    let dragging=false, sx=0, sy=0, bx=0, by=0, moved=false;
+    function onDown(e){
+      const p = e.touches? e.touches[0]: e;
+      dragging=true; moved=false;
+      sx = p.clientX; sy = p.clientY;
+      const r = el.getBoundingClientRect();
+      bx = r.left; by = r.top;
+      el.setPointerCapture && el.setPointerCapture(e.pointerId||0);
+      el.style.transition='opacity .25s ease'; // mantém transição suave
+      document.addEventListener('pointermove', onMove, {passive:false});
+      document.addEventListener('pointerup', onUp, {passive:false, once:true});
+    }
+    function onMove(e){
+      if(!dragging) return;
+      const p = e.touches? e.touches[0]: e;
+      const dx = p.clientX - sx, dy = p.clientY - sy;
+      if(Math.abs(dx)+Math.abs(dy) < 3) return; // limiar anti-toque acidental
+      moved = true;
+      let nx = clamp(bx+dx, SAFE.left, vw()-SAFE.right-el.offsetWidth);
+      let ny = clamp(by+dy, SAFE.top, vh()-SAFE.bottom-el.offsetHeight);
+      el.style.left = nx+'px'; el.style.top = ny+'px';
+      el.style.right='auto'; el.style.bottom='auto';
+      e.preventDefault();
+    }
+    function onUp(e){
+      dragging=false;
+      document.removeEventListener('pointermove', onMove);
+      // Snap opcional às bordas
+      if(el.getAttribute('data-edge')==='1'){
+        const r = el.getBoundingClientRect();
+        const sn = snapToEdge(r.left, r.top, el);
+        el.style.left = sn.x+'px'; el.style.top = sn.y+'px';
+      }
+      // Persiste em porcentagem
+      const r2 = el.getBoundingClientRect();
+      const pct = percFromPx(r2.left, r2.top, el);
+      STATE[key] = pct; UpperStory.set(DBKEY, STATE);
+    }
+
+    el.addEventListener('pointerdown', onDown);
+
+    // Reconcilia em resize/orientation
+    window.addEventListener('resize', ()=>{
+      const st = STATE[key]; if(!st) return;
+      const pos = pxFromPerc(st, el);
+      el.style.left = pos.x+'px'; el.style.top = pos.y+'px';
+      el.style.right='auto'; el.style.bottom='auto';
+    });
+  }
+
+  function scan(){ document.querySelectorAll(DRIFT_SELECTOR).forEach(makeDrift); }
+  scan();
+  new MutationObserver(()=>scan()).observe(document.documentElement, {subtree:true, childList:true});
+
+  // Exponível para debug (opcional)
+  window.KOB_DRIFT = {
+    scan, state: STATE,
+    reset(key){ if(key){ delete STATE[key]; }else{ for(const k in STATE) delete STATE[k]; } UpperStory.set(DBKEY, STATE); scan(); }
+  };
+})();
+</script>
 </body></html>
