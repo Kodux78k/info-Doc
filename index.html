@@ -3918,8 +3918,8 @@ function pickVoiceFor(text){
 
     if(__tts_voice) u.voice = __tts_voice;
     u.lang = (__tts_voice && __tts_voice.lang) || 'pt-BR';
-    u.rate = 0.97;
-    u.pitch = 1.09;
+    u.rate = 1.02;
+    u.pitch = 0.98;
     u.volume = 1.0;
 
     u.onstart = () => setStatus('Lendo...');
@@ -4139,7 +4139,7 @@ function pickVoiceFor(text){
 
   // Mapa padrão (tokens) + merge com overrides do app
   const VOICE_MAP = Object.assign({
-    Atlas:'es_m', Nova:'Luciana', Vitalis:'pt_m', Pulse:'Eddy',
+    Atlas:'es_m', Nova:'Luciana', Vitalis:'pt_m', Pulse:'Grandma',
     Artemis:'Monica', Serena:'Joana', Kaos:'Rocko', Genus:'pt_m',
     Lumine:'Flo', Solus:'es_m', Rhea:'Joana', Aion:'Monica'
   }, (window.ARQ_VOICE_MAP||{}));
