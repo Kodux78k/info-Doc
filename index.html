@@ -4877,7 +4877,7 @@ function pickVoiceFor(text){
   const css = `
   :root{
     /* duração padrão da transição de tema (pode ajustar aqui) */
-    --kob-voice-theme-duration: 2600ms;
+    --kob-voice-theme-duration: 6600ms;
   }
 
   /* Tudo que costuma mudar de cor quando o tema troca */
@@ -4906,6 +4906,86 @@ function pickVoiceFor(text){
   document.head.appendChild(style);
 
   console.log('🎨 KOB_THEME_TRANSITION_SOFT_OVERRIDE ativo (fade ~1.1s)');
+})();
+</script>
+
+<!-- KOBLLUX · Soft Fade Extra para BACKGROUND -->
+<script id="KOB_BG_FADE_OVERRIDE">
+(()=>{
+  if (window.__KOB_BG_FADE_OVERRIDE__) return;
+  window.__KOB_BG_FADE_OVERRIDE__ = true;
+
+  const css = `
+  :root{
+    --kob-voice-theme-duration: 7800ms;
+  }
+
+  /* Fade suave pro fundo principal e o glow nebuloso */
+  body,
+  .nebula{
+    transition:
+      background-color var(--kob-voice-theme-duration) ease-in-out !important,
+      background        var(--kob-voice-theme-duration) ease-in-out !important,
+      box-shadow        var(--kob-voice-theme-duration) ease-in-out !important,
+      color             var(--kob-voice-theme-duration) ease-in-out !important,
+      filter            var(--kob-voice-theme-duration) ease-in-out !important;
+  }
+  `;
+
+  const style = document.createElement('style');
+  style.id = 'KOB_BG_FADE_CSS';
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  console.log('🎨 KOB_BG_FADE_OVERRIDE ativo (body + .nebula com fade ~1.2s)');
+})();
+</script>
+
+<!-- KOBLLUX · PATCH Buttons Fade + TTS Dock Soft Shadow -->
+<script id="KOB_BUTTON_FADE_AND_TTS_SHADOW_PATCH">
+(()=>{
+  if (window.__KOB_BUTTON_FADE_AND_TTS_SHADOW_PATCH__) return;
+  window.__KOB_BUTTON_FADE_AND_TTS_SHADOW_PATCH__ = true;
+
+  const css = `
+  :root{
+    /* usa o mesmo timing do tema de voz, ou define aqui se quiser independente */
+    --kob-voice-theme-duration: 1100ms;
+  }
+
+  /* Fades suaves para botões, chips e afins */
+  .btn,
+  .chip,
+  button,
+  #fab,
+  .fab,
+  .menu button,
+  details.acc,
+  details.acc summary,
+  .kob-tts-dock button,
+  .kob-tts-panel.is-dock button{
+    transition:
+      background-color var(--kob-voice-theme-duration) ease-in-out,
+      background        var(--kob-voice-theme-duration) ease-in-out,
+      border-color      var(--kob-voice-theme-duration) ease-in-out,
+      color             var(--kob-voice-theme-duration) ease-in-out,
+      box-shadow        var(--kob-voice-theme-duration) ease-in-out;
+  }
+
+  /* Shadow mais discreto pro dock de TTS */
+  .kob-tts-dock{
+    box-shadow:
+      0 6px 14px rgba(0,0,0,.30),
+      inset 0 0 0 1px rgba(255,255,255,.04) !important;
+  }
+  `;
+
+  const style = document.createElement('style');
+  style.id = 'KOB_BUTTON_FADE_AND_TTS_SHADOW_CSS';
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  console.log('🎨 KOB_BUTTON_FADE_AND_TTS_SHADOW_PATCH ativo (fade botões + shadow TTS suave)');
 })();
 </script>
 
