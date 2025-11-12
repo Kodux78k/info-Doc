@@ -443,6 +443,35 @@ button.btn[onclick="closeImporter()"]{
 }
 </style>
 
+<style id="KOB_PATCH_IFRAME_VIDEO">
+  /* Iframes dentro do conteúdo gerado (root / aninhado) */
+  #root iframe,
+  .lv-content iframe,
+  .nested-view iframe{
+    display:block;
+    width:100%;
+    max-width:100%;
+    aspect-ratio:16/9;
+    height:auto;
+    border:none;
+    border-radius:12px;
+    margin:12px 0;
+    box-shadow:0 12px 32px rgba(0,0,0,.55);
+    background:#000;
+  }
+
+  /* Se estiver em coluna estreita, deixa um pouco mais compacto */
+  @media (max-width: 480px){
+    #root iframe,
+    .lv-content iframe,
+    .nested-view iframe{
+      border-radius:10px;
+      margin:10px 0;
+    }
+  }
+</style>
+
+
 
 </head>
 <body>
@@ -990,18 +1019,33 @@ function autoBuildNested(text){
   const lines = text.replace(/\r\n?/g,'\n').split('\n');
   let i = 0, inCode = false, codeLang = '', buf = [];
   let inFn = false, fnDepth = 0;
-
-  const flushParagraph = ()=>{
+  // RAW HTML inline (iframe, video, etc.) para o builder aninhado
+  const RX_RAW_INLINE = /^\s*<\s*(iframe|video|audio|img|figure|div|section|article|embed|object|svg)\b/i;
+    const flushParagraph = ()=>{
     if(!buf.length) return;
     const content = buf.join(' ').trim();
+
+    // Bloco de função inteira (continua igual)
     if(/^\s*(?:export\s+)?function\s+\w+\s*\([^)]*\)\s*\{[^]*\}\s*$/.test(content)){
       const div = document.createElement('div');
       div.className = 'equation copyable fn';
       div.innerHTML = '<span class="copy-hint">Copiar</span>' + content;
       div.onclick = ()=>copy(div);
       currentContainer().appendChild(div);
-      buf.length = 0; return;
+      buf.length = 0;
+      return;
     }
+
+    // 🔥 HTML inline (iframe, video, etc.) — renderiza como HTML real
+    if(/^\s*</.test(content) && RX_RAW_INLINE.test(content)){
+      const wrap = document.createElement('div');
+      wrap.innerHTML = content;
+      currentContainer().appendChild(wrap);
+      buf.length = 0;
+      return;
+    }
+
+    // Padrão: parágrafo markdown
     const p = document.createElement('p');
     p.innerHTML = inlineMD(content);
     currentContainer().appendChild(p);
