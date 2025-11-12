@@ -30,6 +30,17 @@ textarea{width:100%;height:160px;border-radius:10px;border:1px solid rgba(255,25
 @page{size:A4;margin:18mm}@media print{#fab,#imp,#toasts,.copy-hint,#read-exit{display:none!important}body{background:#fff;color:#000}details.acc{background:#fff;border-color:#ddd;box-shadow:none}}
 .reading body{font-size:18px;line-height:1.85}.reading .wrap{max-width:780px;padding:20px 18px}.reading #fab,.reading #imp,.reading #toasts,.reading .copy-hint{display:none!important}
 
+.video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+}
+.video-wrapper iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  border-radius: 8px;
+}
 
 /* === Markdown+ blocks === */
 pre.md-code{position:relative;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
