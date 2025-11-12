@@ -1,0 +1,237 @@
+<!-- ============ KOBLLUX • PATCH ÚNICO (V1) ============ -->
+<style id="KOBLLUX_PATCH_UNICO_V1_CSS">
+/* TableLock */
+.table-wrap{border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:auto;background:rgba(255,255,255,.03);margin:12px 0;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}
+table.tbl-lock{width:100%;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;color:var(--ink, #e8ecf6)}
+.tbl-lock thead th{position:sticky;top:0;z-index:1;background:linear-gradient(var(--nebula-angle,42deg),rgba(255,255,255,.10),rgba(255,255,255,.06));color:var(--ink,#e8ecf6);text-align:left;font-weight:700;border-bottom:1px solid rgba(255,255,255,.18)}
+.tbl-lock th,.tbl-lock td{padding:.65rem .8rem;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top;background:transparent}
+.tbl-lock tr:last-child>*{border-bottom:0}.tbl-lock tr:hover>td{background:rgba(255,255,255,.035)}.tbl-lock tbody tr:nth-child(even)>td{background:rgba(255,255,255,.02)}
+.table-wrap:not([data-scrolling]) .tbl-lock thead th:first-child{border-top-left-radius:12px}.table-wrap:not([data-scrolling]) .tbl-lock thead th:last-child{border-top-right-radius:12px}
+.tbl-lock [data-type=num],.tbl-lock .num{text-align:right}
+@media (max-width:560px){
+  .table-wrap.stacked-sm .tbl-lock thead{display:none}
+  .table-wrap.stacked-sm .tbl-lock,.table-wrap.stacked-sm .tbl-lock tbody,.table-wrap.stacked-sm .tbl-lock tr,.table-wrap.stacked-sm .tbl-lock td{display:block;width:100%}
+  .table-wrap.stacked-sm .tbl-lock tr{border-bottom:1px dashed rgba(255,255,255,.12);padding:.25rem 0}
+  .table-wrap.stacked-sm .tbl-lock td{border:0;padding:.35rem .6rem .35rem 9ch;position:relative}
+  .table-wrap.stacked-sm .tbl-lock td::before{content:attr(data-label);position:absolute;left:.6rem;top:.35rem;width:8ch;color:var(--muted,#a2acc5);font-weight:600}
+}
+/* FAB mini */
+#fab.compact .fab-btn{width:48px;height:48px;font-size:1.05rem}
+#fab.compact .menu .btn{padding:.45rem .6rem;border-radius:10px;font:600 13px/1 system-ui,sans-serif}
+#fab.compact .menu .btn.mini-icon{width:36px;height:36px;padding:0;display:inline-grid;place-items:center}
+#fab.compact .menu{right:56px;gap:6px}
+/* Σ KaTeX (opcional: oculto por padrão; comente para ver) */
+#fab .menu [data-action="katex"]{display:none!important}
+</style>
+
+<script id="KOBLLUX_PATCH_UNICO_V1">
+(()=>{'use strict';
+if(window.__KOBLLUX_PATCH_UNICO__) return; window.__KOBLLUX_PATCH_UNICO__=true;
+const $=(q,r=document)=>r.querySelector(q), $$=(q,r=document)=>[...r.querySelectorAll(q)], now=()=>new Date().toISOString().replace(/[:.]/g,'-');
+
+/* Toast mínimo */
+function toast(m,ms=1600){let t=$('#kx_toast');if(!t){t=document.createElement('div');t.id='kx_toast';
+Object.assign(t.style,{position:'fixed',left:'50%',bottom:'calc(18px + env(safe-area-inset-bottom,0px))',transform:'translateX(-50%)',padding:'.6rem .9rem',borderRadius:'999px',background:'rgba(0,0,0,.7)',backdropFilter:'blur(6px)',color:'#fff',fontWeight:'600',letterSpacing:'.2px',zIndex:99999,boxShadow:'0 0 0 1px rgba(255,255,255,.08) inset'});document.body.appendChild(t);}t.textContent=m;t.style.opacity='1';clearTimeout(toast._t);toast._t=setTimeout(()=>t.style.opacity='0',ms);}
+
+/* StorageSafe */
+const NS='infodose::v3::'; const SS={ns:k=>NS+k,get(k,d=null){const r=localStorage.getItem(NS+k);if(r==null)return d;try{return JSON.parse(r);}catch(e){localStorage.setItem('backup::'+NS+k+'::'+Date.now(),r);localStorage.removeItem(NS+k);return d;}},set(k,v){try{localStorage.setItem(NS+k,JSON.stringify(v));}catch(e){}},del:k=>localStorage.removeItem(NS+k)};
+
+/* KaTeX autorun (on-demand) */
+function loadOnceCSS(h,id){return new Promise(ok=>{if($('#'+id))return ok();const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=h;l.onload=ok;document.head.appendChild(l);});}
+function loadOnceJS(s,id){return new Promise(ok=>{if($('#'+id))return ok();const x=document.createElement('script');x.id=id;x.src=s;x.defer=true;x.onload=ok;document.head.appendChild(x);});}
+async function ensureKaTeX(){if(window.renderMathInElement)return;const CDN="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist";
+await loadOnceCSS(`${CDN}/katex.min.css`,'katex_css');await loadOnceJS(`${CDN}/katex.min.js`,'katex_js');await loadOnceJS(`${CDN}/contrib/auto-render.min.js`,'katex_auto_js');}
+async function KaTeXRender(root=document.body){await ensureKaTeX();if(window.renderMathInElement){window.renderMathInElement(root,{delimiters:[{left:"$$",right:"$$",display:true},{left:"\\[",right:"\\]",display:true},{left:"$",right:"$",display:false},{left:"\\(",right:"\\)",display:false}],throwOnError:false,ignoredTags:["script","noscript","style","textarea","code","pre"]});}}
+window.KaTeXRender = window.KaTeXRender||KaTeXRender;
+
+/* TableLock */
+function isNum(t){return /^[-+]?(\d{1,3}(\.\d{3})*|\d+)(,\d+|\.\d+)?(%|x)?$/.test(String(t).trim());}
+function enhanceTable(tb){if(tb.matches('[data-free]'))return;let wrap=tb.closest('.table-wrap');if(!wrap){wrap=document.createElement('div');wrap.className='table-wrap stacked-sm';tb.parentNode.insertBefore(wrap,tb);wrap.appendChild(tb);}tb.classList.add('tbl-lock');
+const flag=()=>wrap.toggleAttribute('data-scrolling',wrap.scrollWidth>wrap.clientWidth);flag();wrap.addEventListener('scroll',flag,{passive:true});
+const heads=[...tb.querySelectorAll('thead th')].map(th=>(th.textContent||'').trim());if(heads.length){tb.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>td.setAttribute('data-label',td.getAttribute('data-label')||heads[i]||'')));}
+tb.querySelectorAll('tbody td').forEach(td=>{const t=(td.textContent||'').trim();if(isNum(t)) td.classList.add('num'),td.setAttribute('data-type','num');});}
+function TableLockRun(root=document){$$('table',root).forEach(enhanceTable);} window.TableLock = window.TableLock||{run:TableLockRun};
+
+/* Tabelas Markdown → <table> */
+function mdTablesToHTML(s){const rx=/(^|\n)(\|[^\n]+?\|)\n(\|[ \t:\-\|]+\|)\n((?:\|[^\n]+?\|\n?)+)/g;return s.replace(rx,(_,lead,head,sep,body)=>{const H=head.split('|').slice(1,-1).map(h=>h.trim());
+const A=sep.split('|').slice(1,-1).map(a=>{a=a.trim();return(a.startsWith(':')&&a.endsWith(':'))?'center':(a.endsWith(':')?'right':'left');});
+const rows=body.trim().split('\n').map(r=>r.split('|').slice(1,-1).map(c=>c.trim()));
+let thead='<thead><tr>'+H.map((h,i)=>`<th style="text-align:${A[i]||'left'}">${h}</th>`).join('')+'</tr></thead>';
+let tbody='<tbody>'+rows.map(r=>'<tr>'+r.map((c,i)=>{const num=isNum(c);const cls=num?' data-type="num"':'';const al=(A[i]||'left');return `<td${cls} style="text-align:${al}">${c}</td>`;}).join('')+'</tr>').join('')+'</tbody>';
+return `${lead}<table>${thead}${tbody}</table>\n`;});}
+
+/* RAW HTML compat + CSS inline seguro */
+function CSS_INNER_SAFE(root=document){let css='';root.querySelectorAll('style[data-inline]').forEach(el=>{const t=(el.textContent||'').trim();if(t) css+='\n'+t;});if(css){let s=$('#INLINE_CSS_RENDER_SAFE_V2');if(!s){s=document.createElement('style');s.id='INLINE_CSS_RENDER_SAFE_V2';document.head.appendChild(s);}s.appendChild(document.createTextNode('\n'+css));}}
+function looksRaw(s){return /<\/?(div|figure|iframe|video|audio|svg|object|embed|table|section|article|img|pre|code|details|blockquote|style)\b/i.test(s);}
+function renderRawHTML(html,into){const slot=document.createElement('div');slot.innerHTML=html;into.appendChild(slot); if(slot.querySelector('table')) TableLockRun(slot); CSS_INNER_SAFE(slot);}
+
+/* Markdownify básico + callouts */
+function looksTitle(l){const t=l.trim();return t.length<80&&/^[A-ZÁÂÃÀÉÊÍÓÔÕÚÜÇ0-9][^.!?]{2,}$/.test(t);}
+function isSubtitle(l){const t=l.trim();return t.length<90&&/[:—–-]\s+/.test(t);}
+function bullets(l){return l.replace(/^\s*(\d+)[\)\]]\s+/,'$1. ').replace(/^\s*[•·]\s+/,'- ');}
+function markdownifyPlain(txt){const L=String(txt||'').replace(/\r\n?/g,'\n').split('\n');if(/^\s*#\s+/.test(txt))return txt;let out=[],h1=false,i=0;while(i<L.length){let ln=L[i];
+if(/^\s*[—–-]{6,}\s*$/.test(ln)){out.push('','---','');i++;continue;} if(!h1&&looksTitle(ln)){out.push('# '+ln.trim(),'');h1=true;i++;continue;}
+if(isSubtitle(ln)&&h1){out.push('## '+ln.trim(),'');i++;continue;} ln=bullets(ln); const m=ln.match(/^\s*([A-ZÁÂÃÀÉÊÍÓÔÕÚÜÇ].{1,40}):\s+(.+)$/); if(m){out.push(':'+m[1]+' — '+m[2]);i++;continue;}
+out.push(ln);i++;}return out.join('\n');}
+
+/* Hook preprocessMD (se existir) */
+(function hookupPreprocess(){
+  if(typeof window.preprocessMD==='function' && !window.preprocessMD.__kxPatched){
+    const orig=window.preprocessMD;
+    window.preprocessMD=function(t){let x=String(t||''); const lacks=!/^\s*#{1,6}\s+/m.test(x)&&!/^\s*\S+\n[-=]{3,}\s*$/m.test(x); const many=(x.match(/\S+/g)||[]).length>40;
+      if(lacks&&many) x=markdownifyPlain(x);
+      x=x.replace(/^::(note|aside|success|danger|question)\s*\n([\s\S]*?)(?=\n\n|$)/gm,(m,k,b)=>`> **${k.toUpperCase()}:**\n> ${b.replace(/\n/g,'\n> ')}`);
+      return orig(x);
+    }; window.preprocessMD.__kxPatched=true;
+  }
+})();
+
+/* Envelopa builders para KaTeX+TableLock+MD tables+RAW */
+['autoBuild','autoBuildNested'].forEach(name=>{
+  const f=window[name];
+  if(typeof f==='function' && !f.__kxWrap){
+    window[name]=function(text){
+      const root=$('#root')||document.body;
+      const src=String(text||'');
+      // MD tables pré
+      const src2 = mdTablesToHTML(src);
+      // RAW?
+      if(looksRaw(src2)){ root.innerHTML=''; const d=document.createElement('div'); d.className='card'; root.appendChild(d); renderRawHTML(src2,d); KaTeXRender(d); TableLockRun(d); toast('Render (RAW) ✓'); return; }
+      const out=f(src2);
+      try{ KaTeXRender(root); TableLockRun(root); }catch(e){}
+      return out;
+    }; window[name].__kxWrap=true;
+  }
+});
+
+/* FAB Σ KaTeX */
+(function FAB_KATEX(){
+  function activeRoot(){const picks=['[data-pane="active"]','.stack .doc.active','.pane.active','#renderOut','#mdOut','#viewer','#content','#root','main','article']; for(const s of picks){const el=$(s); if(el)return el;} return document.body;}
+  function ensureAction(){window.ACTIONS=window.ACTIONS||{}; if(typeof window.ACTIONS.katex!=='function'){window.ACTIONS.katex=()=>KaTeXRender(activeRoot()).then(()=>toast('Σ KaTeX: render ✓'));}}
+  function ensureBtn(){const m=$('#fab .menu'); if(!m||m.querySelector('[data-action="katex"]'))return; const b=document.createElement('button'); b.className='btn'; b.dataset.action='katex'; b.textContent='Σ KaTeX'; b.title='Render KaTeX'; m.appendChild(b);}
+  function bind(){const m=$('#fab .menu'); if(!m||m.dataset.kxBound)return; m.dataset.kxBound='1'; m.addEventListener('click',e=>{const t=e.target.closest('[data-action="katex"]'); if(!t)return; e.preventDefault(); ensureAction(); window.ACTIONS.katex();},true);}
+  function watch(){const f=$('#fab'); if(!f||f.__kxObs)return; const o=new MutationObserver(()=>{ensureAction(); ensureBtn(); bind();}); o.observe(f,{childList:true,subtree:true}); f.__kxObs=o;}
+  (document.readyState!=='loading')?(ensureAction(),ensureBtn(),bind(),watch()):document.addEventListener('DOMContentLoaded',()=>{ensureAction();ensureBtn();bind();watch();});
+})();
+
+/* FAB minificado (ícones básicos) */
+(function FAB_MINI(){
+  const ICON={home:'🏠',importar:'📥',save:'💾',pdf:'🖨️',md:'📝',reading:'📖',theme:'🎨',back:'↩️'};
+  function build(items){const fab=$('#fab'); if(!fab)return; fab.classList.add('compact'); const m=fab.querySelector('.menu'); if(!m)return; if(!m.dataset._orig) m.dataset._orig=m.innerHTML; m.innerHTML=''; (items||window.FAB_MINI_ITEMS||['home','importar','save','pdf']).forEach(act=>{const b=document.createElement('button'); b.className='btn mini-icon'; b.dataset.action=act; b.title=act; b.textContent=ICON[act]||'•'; m.appendChild(b);});}
+  function apply(){build();} function watch(){const f=$('#fab'); if(!f||f.__mini)return; f.__mini=true; new MutationObserver(apply).observe(f,{childList:true,subtree:true});}
+  (document.readyState!=='loading')?(apply(),watch()):document.addEventListener('DOMContentLoaded',()=>{apply();watch();});
+  window.FAB_MINI={apply,set:arr=>{window.FAB_MINI_ITEMS=arr;apply();}};
+})();
+
+/* Stacks Home (biblioteca local) */
+const LIB='tl_library_v1';
+function libLoad(){try{return JSON.parse(localStorage.getItem(LIB)||'[]')}catch{return []}}
+function libSave(a){localStorage.setItem(LIB,JSON.stringify(a))}
+function libAdd(d){const a=libLoad(); a.unshift(d); libSave(a);}
+function analyzeMD(md){const w=(md.match(/\S+/g)||[]).length,h=(md.match(/^\s*#/gm)||[]).length,c=(md.match(/^\s*```/gm)||[]).length,q=(md.match(/^\s*>/gm)||[]).length; return {w,h,c,q};}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+window.renderWelcome=function(){
+  const name = localStorage.getItem('tl_user_name')||'';
+  const root=$('#root')||document.body; const items=libLoad();
+  const cards = items.map(d=>{const a=analyzeMD(d.md); const dt=new Date(d.updatedAt||d.createdAt||Date.now()).toLocaleString();
+    return `<div class="stack-card"><h4>${esc(d.title||'Sem título')}</h4><div class="meta">${dt} · ${a.w} palavras</div>
+      <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" data-action="open-doc" data-id="${d.id}">Abrir</button>
+        <button class="btn" data-action="rename-doc" data-id="${d.id}">Renomear</button>
+        <button class="btn" data-action="analisar-doc" data-id="${d.id}">Analisar</button>
+        <button class="btn" data-action="md-doc" data-id="${d.id}">Exportar .md</button>
+        <button class="btn" data-action="del-doc" data-id="${d.id}">Excluir</button>
+      </div></div>`;}).join('');
+  root.innerHTML = `<details class="acc" open><summary><span class="chev">›</span><h2>👋 Boas-vindas${name? (', '+esc(name)) : ''}</h2></summary>
+    <div class="sec"><div class="welcome"><div class="row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input id="welcomeName" class="field" placeholder="Seu nome" value="${esc(name)}" />
+      <button class="btn" data-action="save-name">Salvar nome</button>
+      <button class="btn" data-action="importar">Enviar Documento</button>
+      <button class="btn" data-action="demo">Gerar Demo</button>
+      <button class="btn" data-action="gerar">Gerar do Editor</button>
+      <button class="btn" data-action="nested">Gerar (aninhado)</button>
+      <button class="btn" data-action="md">Exportar .md</button>
+      <button class="btn" data-action="pdf">Imprimir (PDF)</button>
+      <button class="btn" data-action="reading">Modo Leitura</button>
+      <button class="btn" data-action="theme">Trocar Tema</button>
+    </div>
+    <div class="small" style="margin-top:8px">Stacks salvos no dispositivo:</div>
+    <div class="stack-grid">${cards||'<div class="small" style="opacity:.8">Sem documentos salvos ainda.</div>'}</div>
+  </div></div></details>`;
+}
+/* Ações Stacks/Home */
+window.ACTIONS = window.ACTIONS||{};
+Object.assign(window.ACTIONS,{
+  home(){ renderWelcome(); },
+  gerar(){ const ta=$('#srcText'); if(ta&&typeof window.autoBuild==='function') autoBuild(ta.value||''); },
+  nested(){ const ta=$('#srcText'); if(ta&&typeof window.autoBuildNested==='function') autoBuildNested(ta.value||''); },
+  'open-doc'(el){ const id=el?.dataset?.id; const doc=libLoad().find(x=>x.id===id); if(doc && typeof window.autoBuild==='function') autoBuild(doc.md); },
+  'del-doc'(el){ const id=el?.dataset?.id; libSave(libLoad().filter(d=>d.id!==id)); renderWelcome(); },
+  'rename-doc'(el){ const id=el?.dataset?.id; const arr=libLoad(); const i=arr.findIndex(x=>x.id===id); if(i<0)return; const v=prompt('Novo título',arr[i].title)||''; if(v.trim()){arr[i].title=v.trim(); arr[i].updatedAt=new Date().toISOString(); libSave(arr); renderWelcome();} },
+  'analisar-doc'(el){ const id=el?.dataset?.id; const d=libLoad().find(x=>x.id===id); if(!d) return; const a=analyzeMD(d.md); toast(`Palavras: ${a.w} · H#: ${a.h} · Código: ${a.c} · Citações: ${a.q}`); },
+  'md-doc'(el){ const id=el?.dataset?.id; const d=libLoad().find(x=>x.id===id); if(!d)return; const b=new Blob([d.md],{type:'text/markdown'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=(d.title||'documento')+'.md'; a.click(); URL.revokeObjectURL(a.href); },
+  'save-name'(){ const el=$('#welcomeName'); const v=(el&&el.value||'').trim(); if(v){localStorage.setItem('tl_user_name',v);} else {localStorage.removeItem('tl_user_name');} renderWelcome(); }
+});
+document.addEventListener('click',e=>{
+  const on=(a)=>{const t=e.target.closest(`[data-action="${a}"]`); if(t){e.preventDefault(); (window.ACTIONS[a]||(()=>toast('Ação indisponível'))) (t);}};
+  ['open-doc','del-doc','rename-doc','analisar-doc','md-doc','save-name'].forEach(on);
+});
+
+/* ROM (Read-Only Models) */
+(function ROM(){
+  const make=(id,title,md)=>({id,title,md,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  const ROMS=[
+    make('rom_katex_tables','Demo — KaTeX + Tabelas',`# Demo — KaTeX + Tabelas
+Inline: $E = mc^2$
+Bloco: $$\\int_{0}^{1} x^2\\,dx = \\tfrac{1}{3}$$
+
+| Produto | Qtd | Preço |
+|---------|----:|------:|
+| Orbe Azul | 2 | 79,90 |
+| Pad Nebula | 4 | 15,00 |`),
+    make('rom_369','Ritual 3·6·9 (modelo)',`# Ritual 3·6·9
+## 3 • Foco
+- Respiração 3 min
+- Intenção: **clareza**
+## 6 • Expansão
+- Escrever 6 linhas
+## 9 • Integração
+- Ler em voz alta por 90s`),
+    make('rom_html_svg','HTML + SVG (raw)',`# HTML + SVG
+<style data-inline>.box{border:1px dashed #67e6ff;padding:8px;border-radius:8px;margin:6px 0}</style>
+<div class="box">Bloco HTML com <b>CSS inline seguro</b>.</div>
+<svg viewBox="0 0 120 20" width="160" height="28" style="display:block"><text x="0" y="14" fill="#8ff296">KOBLLUX</text></svg>`),
+    make('rom_callouts','Callouts + Código',`# Callouts
+::note
+Dica: use **Stacks** para salvar e reabrir.
+## Código
+\`\`\`js
+function ola(){ console.log('Nebula Pro + Base Madeira'); }
+ola();
+\`\`\``)
+  ];
+  function romCards(){return `<div class="stack-grid" id="rom-grid">${
+    ROMS.map(d=>`<div class="stack-card"><h4>${d.title}</h4><div class="meta">ROM • modelo</div>
+    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" data-action="rom-open" data-id="${d.id}">Pré-visualizar</button>
+      <button class="btn" data-action="rom-clone" data-id="${d.id}">Clonar para Stacks</button>
+    </div></div>`).join('')}</div>`;}
+  function attach(){const root=$('#root'); if(!root)return; const sec=root.querySelector('.welcome'); let host=sec?sec:root; if(!$('#rom-grid')){const h3=document.createElement('h3');h3.style.margin='12px 0 6px 0';h3.textContent='ROM (modelos)'; const wrap=document.createElement('div'); wrap.innerHTML=romCards(); if(sec){sec.appendChild(h3);sec.appendChild(wrap.firstElementChild);} else {host.appendChild(h3);host.appendChild(wrap.firstElementChild);} }
+  }
+  const rw=window.renderWelcome;
+  window.renderWelcome=function(){const out=rw&&rw.apply(this,arguments); try{attach();}catch{} return out;}
+  document.addEventListener('click',e=>{
+    const open=e.target.closest('[data-action="rom-open"]'); const clone=e.target.closest('[data-action="rom-clone"]');
+    if(open){const id=open.dataset.id; const doc=ROMS.find(x=>x.id===id); if(doc&&typeof window.autoBuild==='function') autoBuild(doc.md);}
+    if(clone){const id=clone.dataset.id; const doc=ROMS.find(x=>x.id===id); if(!doc)return; const d={id:'s_'+Date.now(),title:doc.title,md:doc.md,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}; const a=libLoad(); a.unshift(d); libSave(a); toast('ROM clonado ✓'); renderWelcome(); }
+  });
+})();
+
+/* Inicia Home/Stacks na primeira carga */
+document.addEventListener('DOMContentLoaded', ()=>{ try{ renderWelcome(); }catch{} });
+
+/* FAB listener genérico (se faltar) */
+const FAB=$('#fab'); if(FAB && !FAB.__bind){FAB.__bind=true; FAB.addEventListener('click',e=>{const b=e.target.closest('[data-action]'); if(!b)return; e.preventDefault(); const act=b.dataset.action; (window.ACTIONS&&window.ACTIONS[act]||(()=>toast('Ação indisponível')))();});}
+})();
+</script>
+<!-- ========== /KOBLLUX PATCH ÚNICO (V1) ========== -->
