@@ -435,6 +435,15 @@ body[data-voice-arch="fitlux"]{
 
 </style>
 
+
+<style id="KOB_PATCH_FECHAR_LEFT">
+/* Mover o botão "Fechar" do importer pro canto ESQUERDO */
+button.btn[onclick="closeImporter()"]{
+  margin-right:auto !important;  /* empurra o botão pra esquerda dentro do flex */
+}
+</style>
+
+
 </head>
 <body>
 <div class="nebula"></div>
@@ -5419,5 +5428,27 @@ document.addEventListener('click',(e)=>{
   if (window.toast) toast('Convertido (RTF→MD, tabelista, tokens, botões)');
 });
 </script>
+
+<!-- KOBLLUX PATCH :: FAB fecha logo após clicar em uma ação -->
+<script>
+(function(){
+  const fab = document.getElementById('fab');
+  if (!fab) return;
+
+  fab.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    // deixa a ação rodar normal, e logo em seguida fecha o menu
+    setTimeout(()=> {
+      fab.classList.remove('open');
+    }, 0);
+  });
+})();
+</script>
+
+<div style="display:flex;gap:10px;justify-content:flex-end;...">
+  <button class="btn" onclick="closeImporter()">Fechar</button>
+</div>
 
 </body></html>
