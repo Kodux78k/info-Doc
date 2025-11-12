@@ -30,17 +30,6 @@ textarea{width:100%;height:160px;border-radius:10px;border:1px solid rgba(255,25
 @page{size:A4;margin:18mm}@media print{#fab,#imp,#toasts,.copy-hint,#read-exit{display:none!important}body{background:#fff;color:#000}details.acc{background:#fff;border-color:#ddd;box-shadow:none}}
 .reading body{font-size:18px;line-height:1.85}.reading .wrap{max-width:780px;padding:20px 18px}.reading #fab,.reading #imp,.reading #toasts,.reading .copy-hint{display:none!important}
 
-.video-wrapper {
-  position: relative;
-  padding-bottom: 56.25%;
-  height: 0;
-}
-.video-wrapper iframe {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  border-radius: 8px;
-}
 
 /* === Markdown+ blocks === */
 pre.md-code{position:relative;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
@@ -417,6 +406,35 @@ body[data-voice-arch="fitlux"]{
 }
 </style>
 
+
+<!-- KOBLLUX PATCH :: TTS Dock uses theme gradient (Nebula V1) and UTF icons -->
+<style id="KOB_PATCH_TTS_DOCK_V1">
+
+.kob-tts-dock{
+  background:linear-gradient(
+    42deg,
+    color-mix(in srgb, var(--grad-a) 18%, transparent),
+    color-mix(in srgb, var(--grad-b) 18%, transparent)
+  ) !important;
+  border:1px solid rgba(255,255,255,.10) !important;
+  color:var(--ink) !important;
+  box-shadow:0 0 18px rgba(0,0,0,.35) !important;
+  backdrop-filter:blur(14px) !important;
+}
+
+.kob-tts-dock button{
+  background:rgba(0,0,0,.25) !important;
+  border:1px solid rgba(255,255,255,.18) !important;
+  color:var(--ink) !important;
+}
+
+.kob-tts-dock{
+  transform: scale(0.85);
+  transform-origin: bottom right; /* ou onde você ancora o dock */
+}
+
+</style>
+
 </head>
 <body>
 <div class="nebula"></div>
@@ -440,7 +458,7 @@ body[data-voice-arch="fitlux"]{
 <div id="imp"><div class="panel">
   <div class="tabs"><div class="tab active" data-tab="text">📝 Texto/Markdown</div><div class="tab" data-tab="audio">🎙️ Áudio→Texto</div><div class="tab" data-tab="file">📄 Arquivo (PDF/TXT/MD)</div></div>
   <div id="tab-text" class="tab-content active"><textarea id="srcText" placeholder="# PRÓLOGO
-Texto aqui..."></textarea><button class="btn" onclick="autoBuild(document.getElementById('srcText').value)">Gerar Livro</button> <button class="btn" onclick="autoBuildNested(document.getElementById('srcText').value)">Gerar (aninhado)</button> <button class="btn" onclick="pasteSrcText()">Colar</button></div>
+Texto aqui..."></textarea><button class="btn" onclick="autoBuild(document.getElementById('srcText').value)">Gerar Livro</button> <button class="btn" onclick="autoBuildNested(document.getElementById('srcText').value)">Gerar (aninhado)</button> <button class="btn" onclick="pasteSrcText()">Colar</button> <button class="btn" id="btn-converter">Converter</button></div>
   <div id="tab-audio" class="tab-content"><textarea id="audioOutput" placeholder="Transcrição aqui..."></textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="startRec">🎤 Iniciar</button><button class="btn" id="stopRec">⏹ Parar</button><button class="btn" onclick="autoBuild(document.getElementById('audioOutput').value)">Usar Transcrição</button></div></div>
   <div id="tab-file" class="tab-content"><input type="file" id="fileInput" accept=".pdf,.txt,.md,.rtf, .html"><div id="filePreview" style="margin-top:10px;color:var(--muted);font-size:.9rem"></div></div>
   <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px"><button class="btn" onclick="closeImporter()">Fechar</button></div>
@@ -4108,7 +4126,7 @@ function pickVoiceFor(text){
     dock.className = 'kob-tts-dock';
     dock.innerHTML = `
       <button type="button" data-tts-btn="toggle" title="TTS On/Off" aria-pressed="false">◎</button>
-      <button type="button" data-tts-btn="sel"    title="Ler seleção">▻</button>
+      <button type="button" data-tts-btn="sel"    title="Ler seleção">▷</button>
       <button type="button" data-tts-btn="stop"   title="Parar voz">■</button>
       <span id="tts-status"></span>
     `;
@@ -5314,6 +5332,92 @@ window.RTF_RENDER = {
 };
 
 })();
+</script>
+
+
+<!-- KOBLLUX PATCH :: FAB auto-close on action click / outside click -->
+<script id="KOB_PATCH_FAB_AUTOCLOSE">
+(function(){
+  const fab = document.getElementById('fab');
+  const toggle = document.getElementById('fab-toggle');
+  if(!fab || !toggle) return;
+  // Close when clicking an action
+  document.addEventListener('click', (e)=>{
+    const a = e.target.closest('[data-action]');
+    if (a && fab.classList.contains('open')) fab.classList.remove('open');
+  });
+  // Close when clicking outside
+  document.addEventListener('click', (e)=>{
+    const withinFab = e.target.closest('#fab');
+    if (!withinFab && fab.classList.contains('open')) fab.classList.remove('open');
+  }, true);
+})();
+</script>
+
+
+<!-- KOBLLUX PATCH :: Converter (RTF→MD, tabelista, tokens, buttons) -->
+<script id="KOB_PATCH_CONVERTER">
+function convertSourceToMD(raw){
+  if (!raw) return '';
+  // RTF → texto básico
+  if (/^{\\rtf/i.test(raw)) {
+    raw = raw
+      .replace(/\\par[d]?/g, '\n')
+      .replace(/\\tab/g, '\t')
+      .replace(/\\'[0-9a-fA-F]{2}/g, ' ')      // escapes hex → espaço
+      .replace(/\\[a-zA-Z]+\d*/g, '')          // comandos \b \i \fs...
+      .replace(/[{}]/g, '')                    // remove braces do RTF
+      .replace(/\n{2,}/g, '\n\n');
+  }
+  // normalizações
+  let text = raw
+    .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+    .replace(/\r\n?/g, '\n')
+    .trim();
+
+  // TABELISTA (pula 1–2; 3 = header; 4 = <auto>; 5+ dados)
+  text = text.replace(
+    /(?:^|\n)#[^\n]*\n#[^\n]*\n\s*([\w\W]*?)\n\s*<auto>\n([\w\W]*?)(?=\n{2,}|$)/g,
+    function(_, headerLine, dataBlock){
+      const header = headerLine.split('|').map(s=>s.trim()).filter(Boolean);
+      if (!header.length) return _;
+      const sep = '|' + header.map(()=> '---').join('|') + '|';
+      const rows = dataBlock.split('\n')
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith('#'))
+        .map(l => {
+          const cols = l.split('|').map(s=>s.trim());
+          return '| ' + cols.join(' | ') + ' |';
+        });
+      return '\n| ' + header.join(' | ') + ' |\n' + sep + '\n' + rows.join('\n') + '\n';
+    }
+  );
+
+  // botões [[btn:acao|Rótulo]] → HTML
+  text = text.replace(/\[\[btn:([a-z0-9_-]+)(?:\|([^\]]+))?\]\]/gi,
+    function(_,act,label){ return '<button class="btn action" data-action="'+act+'">'+(label||act)+'</button>'; });
+
+  // tokens [voz:] [arch:] saneados (mantidos para o TTS parser)
+  text = text.replace(/\[voz:\s*([^\]]+)\s*\]/gi, '[voz:$1]')
+             .replace(/\[arch:\s*([^\]]+)\s*\]/gi, '[arch:$1]');
+
+  // fences simples: fecha ``` se contar ímpar
+  const fences = (text.match(/```/g)||[]).length;
+  if (fences % 2 === 1) text += '\n```';
+
+  return text;
+}
+
+// Bind converter button if present
+document.addEventListener('click',(e)=>{
+  const btn = e.target.closest('#btn-converter');
+  if(!btn) return;
+  const ta = document.getElementById('srcText');
+  if(!ta) return;
+  const md = convertSourceToMD(ta.value||'');
+  ta.value = md;
+  if (window.toast) toast('Convertido (RTF→MD, tabelista, tokens, botões)');
+});
 </script>
 
 </body></html>
