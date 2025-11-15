@@ -6,8 +6,8 @@
 <title>Portal — Livro Vivo</title>
 <meta name="theme-color" content="#0a0e18" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="icons/icon-d0x.PNG" />
-<link rel="apple-touch-icon" href="icons/icon-d0x.PNG" />
+<link rel="icon" href="icons/icon-192.PNG" />
+<link rel="apple-touch-icon" href="icons/icon-192.PNG" />
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <meta name="color-scheme" content="dark"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
@@ -5297,17 +5297,17 @@ document.addEventListener('click',(e)=>{
 })();
 </script>
 
-<script id="FORCE_LUCIANA_ARQ_OVERRIDE_v4">
+<script id="FORCE_LUCIANA_ARQ_OVERRIDE_v5">
 (()=> {
-  if (window.__FORCE_LUCIANA_ARQ_OVERRIDE_V4__) return;
-  window.__FORCE_LUCIANA_ARQ_OVERRIDE_V4__ = true;
+  if (window.__FORCE_LUCIANA_ARQ_OVERRIDE_V5__) return;
+  window.__FORCE_LUCIANA_ARQ_OVERRIDE_V5__ = true;
 
   if (!('speechSynthesis' in window)) return;
   const synth = window.speechSynthesis;
 
-  // ===== Utils básicos =====
-  const PT = v => /^pt/i.test(v.lang || '');
-  const ES = v => /^es/i.test(v.lang || '');
+  // ===== Utils =====
+  const PT   = v => /^pt/i.test(v.lang || '');
+  const ES   = v => /^es/i.test(v.lang || '');
   const NORM = s => String(s || '')
     .normalize('NFD').replace(/\p{Diacritic}/gu,'')
     .toLowerCase();
@@ -5320,87 +5320,182 @@ document.addEventListener('click',(e)=>{
   // ===== Mapa de vozes por arquétipo (pode sobrescrever via window.ARQ_VOICE_MAP) =====
   const VOICE_MAP = Object.assign({
     Atlas:   'pt_m',
-    Nova:    'Luciana',
-    Vitalis: 'Rocko',
-    Pulse:   'es_m',
-    Artemis: 'Monica',
-    Serena:  'Joana',
-    Kaos:    'Rocko',
+    Nova:    'pt_f',
+    Vitalis: 'pt_m',
+    Pulse:   'pt_m',
+    Artemis: 'pt_f',
+    Serena:  'pt_f',
+    Kaos:    'pt_m',
     Genus:   'pt_m',
-    Lumine:  'Monica',
-    Solus:   'es_m',
-    Rhea:    'Joana',
-    Aion:    'Monica'
+    Lumine:  'pt_f',
+    Rhea:    'pt_f',
+    Solus:   'pt_m',
+    Aion:    'pt_m'
   }, (window.ARQ_VOICE_MAP || {}));
-
-  // expõe pra você editar no console, se quiser:
-  //   setArchetypeVoiceMap({ Atlas:'Monica', Nova:'pt_f' })
   window.ARQ_VOICE_MAP = VOICE_MAP;
 
-  // Heurísticas simples pros nomes típicos (atalho, não trava nada)
+  // ===== Morph leve de pitch/rate por arquétipo =====
+  const ARCH_TUNING = Object.assign({
+    Atlas:   { rate:1.00, pitch:0.98 },
+    Nova:    { rate:1.06, pitch:1.08 },
+    Vitalis: { rate:1.00, pitch:1.02 },
+    Pulse:   { rate:1.10, pitch:1.00 },
+    Artemis: { rate:1.04, pitch:1.06 },
+    Serena:  { rate:0.92, pitch:1.02 },
+    Kaos:    { rate:1.13, pitch:1.05 },
+    Genus:   { rate:1.00, pitch:1.00 },
+    Lumine:  { rate:1.02, pitch:1.03 },
+    Rhea:    { rate:0.96, pitch:0.98 },
+    Solus:   { rate:0.94, pitch:0.96 },
+    Aion:    { rate:0.98, pitch:0.99 }
+  }, (window.ARQ_TUNING || {}));
+  window.ARQ_TUNING = ARCH_TUNING;
+
+  // ===== Palavras-gatilho → arquétipo (do teu manifesto) =====
+  const ARCH_KEYWORDS = Object.assign({
+    Atlas:  ['mapa','rota','roadmap','framework','escopo','blueprint','agenda','milestone'],
+    Nova:   ['ideia','idéia','prototipo','protótipo','mvp','laboratorio','laboratório','experimento','brainstorm','inova','inovar'],
+    Pulse:  ['ritmo','bpm','cadencia','cadência','loop','batida','beat','cadenciar'],
+    Vitalis:['respirar','respire','respiração','hidratar','sono','ergonomia','corpo','postura','energia'],
+    Artemis:['alvo','foco','prioridade','laser','cortar','corte'],
+    Serena:['calma','gentileza','acolhimento','pausa','respire','paz'],
+    Kaos:   ['glitch','bugar','disrupt','caos','quebrar padrão','overclock'],
+    Genus:  ['algoritmo','schema','regex','lógica','logica','merge','contexto'],
+    Lumine: ['lanterna','diagrama','guia','iluminar','clareza','explicar'],
+    Rhea:   ['terra','raiz','nutrir','base','ancorar','ancora','sustentar'],
+    Solus:  ['imersao','imersão','monotarefa','offline','silencio','silêncio'],
+    Aion:   ['ciclo','calendario','calendário','recorrencia','recorrência','369','3·6·9','ritual']
+  }, (window.ARQ_KEYWORDS || {}));
+  window.ARQ_KEYWORDS = ARCH_KEYWORDS;
+
+  // ===== Heurísticas de seleção de voz (nome / idioma) =====
   const NAME_F_PT = /(luciana|vitor[ioa]|camila|maria|sofia|joana)/i;
   const NAME_M_PT = /(daniel|reed|ricardo|miguel|thiago|henrique|felipe|jo[aã]o)/i;
   const NAME_F_ES = /(conchita|m[oó]nica|monica|paulina|luz)/i;
-  const NAME_M_ES = /(jorge|fred|diego|sebasti[aá]n|sebastian)/i;
+  const NAME_M_ES = /(jorge|fred|diego|sebasti[aá]n|sebastian|pablo)/i;
 
   function pickBySpec(spec, vs){
     if (!spec) return null;
     const s = String(spec).trim().toLowerCase();
 
-    // Tokens por idioma (pt_f, es_m, etc)
+    // Tokens genéricos
     if (s === 'pt_f') return vs.find(v => PT(v) && NAME_F_PT.test(v.name || '')) || vs.find(PT) || null;
     if (s === 'pt_m') return vs.find(v => PT(v) && NAME_M_PT.test(v.name || '')) || vs.find(PT) || null;
     if (s === 'es_f') return vs.find(v => ES(v) && NAME_F_ES.test(v.name || '')) || vs.find(ES) || null;
     if (s === 'es_m') return vs.find(v => ES(v) && NAME_M_ES.test(v.name || '')) || vs.find(ES) || null;
 
-    // Idioma genérico
-    if (s === 'pt')   return vs.find(PT) || null;
-    if (s === 'es')   return vs.find(ES) || null;
+    if (s === 'pt') return vs.find(PT) || null;
+    if (s === 'es') return vs.find(ES) || null;
 
-    // Nome direto → parcial (ex: "Monica", "Luciana", "Reed")
+    // Nome direto / parcial (inclui "Microsoft Maria - Portuguese (Brazil)" etc)
     const exact = vs.find(v => NORM(v.name) === NORM(spec));
     if (exact) return exact;
     return vs.find(v => NORM(v.name).includes(NORM(spec))) || null;
   }
 
-  // Detecta tag de arquétipo no começo do parágrafo: [Atlas], [Nova], etc
-  const ARCH_RE = /^\s*\[\s*([a-zA-Z0-9_]+)\s*\]/;
+  // ===== Tags [[[Nova]]] / [Nova] no começo do texto =====
+  const ARCH_RE_TRIPLE = /^\s*\[\s*\[\s*\[\s*([a-zA-Z0-9_]+)\s*\]\s*\]\s*\]/;
+  const ARCH_RE_SINGLE = /^\s*\[\s*([a-zA-Z0-9_]+)\s*\]/;
+
+  function normalizeArchKey(raw){
+    if (!raw) return null;
+    const k = String(raw).trim();
+    return k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
+  }
+
+  function inferArchetypeFromText(text){
+    const t = NORM(text);
+    let bestArch = null;
+    let bestScore = 0;
+    for (const [arch, words] of Object.entries(ARCH_KEYWORDS)){
+      let score = 0;
+      for (const w of words){
+        const wn = NORM(w);
+        if (!wn) continue;
+        if (t.includes(wn)) score += 1;
+      }
+      if (score > bestScore){
+        bestScore = score;
+        bestArch = arch;
+      }
+    }
+    return bestScore > 0 ? bestArch : null;
+  }
+
+  function extractArchAndClean(text){
+    let archKey = null;
+    let cleaned = text || '';
+
+    const m3 = cleaned.match(ARCH_RE_TRIPLE);
+    if (m3){
+      archKey = normalizeArchKey(m3[1]);
+      cleaned = cleaned.replace(ARCH_RE_TRIPLE, '').trim();
+      return { archKey, cleaned };
+    }
+    const m1 = cleaned.match(ARCH_RE_SINGLE);
+    if (m1){
+      archKey = normalizeArchKey(m1[1]);
+      cleaned = cleaned.replace(ARCH_RE_SINGLE, '').trim();
+      return { archKey, cleaned };
+    }
+    return { archKey:null, cleaned };
+  }
 
   function applyArchetypeVoice(u, vs){
     try{
-      const m = (u.text || '').match(ARCH_RE);
-      if (!m) return false; // sem tag [Atlas] / [Nova] etc
+      let text = u.text || '';
+      let { archKey, cleaned } = extractArchAndClean(text);
 
-      const rawArch = m[1];
-      const archKey = rawArch[0].toUpperCase() + rawArch.slice(1).toLowerCase();
+      // Se não teve tag, tenta inferir por semântica
+      if (!archKey){
+        archKey = inferArchetypeFromText(text);
+      }
+
+      if (!archKey) return false;
 
       const spec = VOICE_MAP[archKey];
-      if (!spec) return false;
-
-      const v = pickBySpec(spec, vs);
-      if (v){
-        u.voice = v;
-        // NÃO força idioma: só herda, se não tiver nada definido
-        if (!u.lang && v.lang) u.lang = v.lang;
-        return true;
+      const v = spec ? pickBySpec(spec, vs) : null;
+      if (!v){
+        // Mesmo sem voz específica, ainda limpamos a tag
+        u.text = cleaned;
+        return false;
       }
-      return false;
-    }catch{
+
+      u.voice = v;
+      if (!u.lang && v.lang) u.lang = v.lang;
+
+      const tune = ARCH_TUNING[archKey];
+      if (tune){
+        if (typeof tune.rate === 'number')  u.rate  = tune.rate;
+        if (typeof tune.pitch === 'number') u.pitch = tune.pitch;
+      }
+
+      u.text = cleaned;
+
+      try {
+        if (document && document.body){
+          document.body.dataset.voiceArch = archKey.toLowerCase();
+        }
+      } catch {}
+
+      return true;
+    }catch(e){
+      console.warn('applyArchetypeVoice error', e);
       return false;
     }
   }
 
-  // ===== Fila + override leve do speak (sem Luciana/base forçada) =====
+  // ===== Hook leve no speak/cancel (fila + safe em Windows) =====
   const NATIVE_SPEAK  = window.__KOB_NATIVE_SPEAK__  || synth.speak.bind(synth);
   const NATIVE_CANCEL = window.__KOB_NATIVE_CANCEL__ || synth.cancel.bind(synth);
   window.__KOB_NATIVE_SPEAK__  = NATIVE_SPEAK;
   window.__KOB_NATIVE_CANCEL__ = NATIVE_CANCEL;
 
-  let VOICES    = getVoicesSafe();
-  let ready     = !!VOICES.length;
-  const Q       = [];
-  let polTimer  = null;
-  let tries     = 0;
+  let VOICES   = getVoicesSafe();
+  let ready    = !!VOICES.length;
+  const Q      = [];
+  let polTimer = null;
+  let tries    = 0;
 
   function refreshVoices(){
     VOICES = getVoicesSafe();
@@ -5430,22 +5525,20 @@ document.addEventListener('click',(e)=>{
 
   function wireUtterance(u){
     try{
-      if (u.__kob_wired_v4) return;
-      u.__kob_wired_v4 = true;
-
-      // Só mexe se tiver tag de arquétipo; se não, deixa o TTS padrão decidir a voz
+      if (u.__kob_wired_v5) return;
+      u.__kob_wired_v5 = true;
       applyArchetypeVoice(u, VOICES);
     }catch(e){
-      console.warn('FORCE_LUCIANA_ARQ_OVERRIDE_v4 wireUtterance error', e);
+      console.warn('wireUtterance error', e);
     }
   }
 
   function drainQueue(){
     while(Q.length){
       const u = Q.shift();
-      if (u.__kob_spoken_v4) continue;
+      if (u.__kob_spoken_v5) continue;
       wireUtterance(u);
-      u.__kob_spoken_v4 = true;
+      u.__kob_spoken_v5 = true;
       NATIVE_SPEAK(u);
     }
   }
@@ -5468,11 +5561,13 @@ document.addEventListener('click',(e)=>{
     return NATIVE_CANCEL();
   };
 
-  // prewarm leve
+  // pre-warm
   refreshVoices();
 
-  // helper opcional pra ajustar mapa via código:
-  window.setArchetypeVoiceMap = (m)=> Object.assign(VOICE_MAP, m || {});
+  // helpers pra mexer via console, se quiser
+  window.setArchetypeVoiceMap = (m)=> Object.assign(VOICE_MAP,   m || {});
+  window.setArchetypeTuning   = (m)=> Object.assign(ARCH_TUNING, m || {});
+  window.setArchetypeKeywords = (m)=> Object.assign(ARCH_KEYWORDS, m || {});
 
 })();
 </script>
