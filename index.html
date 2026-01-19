@@ -1452,7 +1452,10 @@ function preprocessMD(text){
 
 /* ===== Home (stacks) ===== */
 function renderWelcome(){
-  const name = localStorage.getItem('tl_user_name')||'';
+const name =
+  localStorage.getItem('tl_user_name') ||
+  localStorage.getItem('di_userName') ||
+  '';
   const root = document.getElementById('root');
   const stacks = libLoad();
   const cards = stacks.map(d=>{
